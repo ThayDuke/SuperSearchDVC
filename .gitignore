@@ -28,3 +28,5 @@ ENV/
 # User private data
 MDBANK/1CICTDATA/
 MDBANK/MARKDOWN/
+MDBANK/src/Lib/
+MDBANK/src/Tesseract-OCR/
