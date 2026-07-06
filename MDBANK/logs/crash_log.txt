@@ -1,0 +1,4 @@
+Pre-import pandas._libs.tslibs.np_datetime failed:
+Traceback (most recent call last):
+  File "app.py", line 230, in scan_and_index
+ModuleNotFoundError: No module named 'pandas'

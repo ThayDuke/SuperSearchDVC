@@ -1,0 +1,4398 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SuperSearch - Tra cứu tài liệu siêu tốc</title>
+    <link rel="icon" type="image/x-icon" href="LogoSS32.ico">
+    <style>
+        :root {
+            /* Pearl Light Theme (Mặc định) */
+            --bg-primary: #e2e8f0;
+            --glass-bg: rgba(255, 255, 255, 0.25);
+            --glass-border: rgba(255, 255, 255, 0.5);
+            --glass-hover-bg: rgba(255, 255, 255, 0.45);
+            --glass-hover-border: rgba(255, 255, 255, 0.8);
+            --text-primary: #0f172a;
+            --text-secondary: #475569;
+            --accent-blue: #3b82f6;
+            --accent-purple: #8b5cf6;
+            --accent-pink: #ec4899;
+            --font-sans: "Segoe UI", Arial, sans-serif;
+            --font-mono: Consolas, "Courier New", monospace;
+            --radius-outer: 24px;
+            --radius-inner: 18px;
+
+            --card-shadow: rgba(15, 23, 42, 0.08);
+            --drawer-bg: rgba(255, 255, 255, 0.75);
+            --code-bg: rgba(0, 0, 0, 0.04);
+            --blob-blend: normal;
+            --blob-opacity: 0.35;
+            --scrollbar-thumb: rgba(0, 0, 0, 0.15);
+
+            /* Search results specifically */
+            --primary-teal: #0ea5e9;
+            --primary-teal-glow: rgba(14, 165, 233, 0.15);
+            --secondary-indigo: #6366f1;
+            --highlight-bg: #fef08a;
+            --highlight-text: #0f172a;
+
+            --transition-fluid: all 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+            --transition-snappy: all 0.25s ease;
+
+            --search-glow-border: linear-gradient(135deg, rgba(37, 99, 235, 0.25), rgba(124, 58, 237, 0.25));
+            --search-shadow: 0 4px 15px rgba(99, 102, 241, 0.08);
+        }
+
+        [data-theme="dark"] {
+            /* Obsidian Dark Theme */
+            --bg-primary: #0a0c10;
+            --glass-bg: rgba(255, 255, 255, 0.03);
+            --glass-border: rgba(255, 255, 255, 0.08);
+            --glass-hover-bg: rgba(255, 255, 255, 0.07);
+            --glass-hover-border: rgba(255, 255, 255, 0.2);
+            --text-primary: #f3f4f6;
+            --text-secondary: #94a3b8;
+            --accent-blue: #38bdf8;
+            --accent-purple: #818cf8;
+            --accent-pink: #f472b6;
+
+            --card-shadow: rgba(0, 0, 0, 0.3);
+            --drawer-bg: rgba(10, 12, 16, 0.85);
+            --code-bg: rgba(0, 0, 0, 0.3);
+            --blob-blend: screen;
+            --blob-opacity: 0.2;
+            --scrollbar-thumb: rgba(255, 255, 255, 0.1);
+
+            --primary-teal: #38bdf8;
+            --primary-teal-glow: rgba(56, 189, 248, 0.15);
+            --secondary-indigo: #818cf8;
+            --highlight-bg: #ea580c;
+            --highlight-text: #ffffff;
+
+            --search-glow-border: linear-gradient(135deg, var(--accent-blue), var(--accent-purple));
+            --search-shadow: 0 8px 25px rgba(99, 102, 241, 0.2);
+        }
+
+        [data-theme="dark"] .blob-3 {
+            background: radial-gradient(circle, rgba(244, 114, 182, 0.25) 0%, rgba(244, 114, 182, 0) 70%);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: var(--font-sans);
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow-x: hidden;
+            position: relative;
+            line-height: 1.5;
+            transition: background-color 0.3s, color 0.3s;
+        }
+
+        body.show-results {
+            --blob-opacity: 0.12 !important;
+        }
+
+        /* Background Blobs (Liquid Effects) */
+        .blob-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: -2;
+            overflow: hidden;
+            pointer-events: none;
+            filter: blur(80px);
+            opacity: var(--blob-opacity);
+            transition: opacity 0.3s;
+        }
+
+        .blob {
+            position: absolute;
+            border-radius: 50%;
+            mix-blend-mode: var(--blob-blend);
+            animation: float 20s infinite ease-in-out alternate;
+        }
+
+        .blob-1 {
+            top: -10%;
+            left: -10%;
+            width: 50vw;
+            height: 50vw;
+            background: radial-gradient(circle, var(--accent-blue) 0%, rgba(59, 130, 246, 0) 70%);
+            animation-duration: 25s;
+        }
+
+        .blob-2 {
+            bottom: -10%;
+            right: -10%;
+            width: 60vw;
+            height: 60vw;
+            background: radial-gradient(circle, var(--accent-purple) 0%, rgba(139, 92, 246, 0) 70%);
+            animation-duration: 30s;
+        }
+
+        .blob-3 {
+            top: 30%;
+            left: 40%;
+            width: 35vw;
+            height: 35vw;
+            background: radial-gradient(circle, var(--accent-pink) 0%, rgba(236, 72, 153, 0) 70%);
+            animation-duration: 22s;
+        }
+
+        @keyframes float {
+            0% {
+                transform: translate(0, 0) scale(1) rotate(0deg);
+            }
+
+            50% {
+                transform: translate(50px, 80px) scale(1.1) rotate(180deg);
+            }
+
+            100% {
+                transform: translate(-30px, -50px) scale(0.9) rotate(360deg);
+            }
+        }
+
+        #hero-canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            pointer-events: none;
+            opacity: 0.15;
+        }
+
+        header {
+            width: 100%;
+            display: flex;
+            justify-content: flex-end;
+            padding: 20px 40px;
+            position: absolute;
+            top: 0;
+            z-index: 100;
+            pointer-events: none;
+        }
+
+        .theme-toggle-btn {
+            background: var(--glass-bg);
+            border: 1px solid var(--glass-border);
+            color: var(--text-primary);
+            height: 36px;
+            width: 36px;
+            padding: 0;
+            border-radius: 50%;
+            cursor: pointer;
+            transition: var(--transition-snappy);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: var(--card-shadow);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            pointer-events: auto;
+            flex-shrink: 0;
+        }
+
+        .theme-toggle-btn .lucide-moon {
+            color: var(--text-secondary);
+        }
+
+        .theme-toggle-btn:hover {
+            transform: translateY(-2px) scale(1.05);
+            background: var(--glass-hover-bg);
+            border-color: var(--glass-hover-border);
+            box-shadow: 0 4px 15px var(--card-shadow);
+        }
+
+        .landing-state .theme-toggle-btn {
+            position: absolute;
+            left: calc(100% - 8px);
+            top: 0;
+            bottom: 0;
+            margin: auto 0;
+        }
+
+        main {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            transition: var(--transition-fluid);
+        }
+
+        /* 1. STATE: LANDING PAGE */
+        .landing-state {
+            justify-content: center;
+            align-items: center;
+            padding-bottom: 8%;
+        }
+
+        .landing-state.scanning {
+            justify-content: flex-start !important;
+            padding-top: 60px !important;
+            padding-bottom: 20px !important;
+        }
+
+        .landing-state .logo-container {
+            margin-bottom: 2rem;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+        }
+
+        .landing-state .logo-title {
+            font-size: 4.16rem;
+            font-weight: 800;
+            letter-spacing: -2px;
+            user-select: none;
+            background: linear-gradient(to bottom,
+                    var(--accent-blue) 15%,
+                    var(--primary-teal) 45%,
+                    var(--accent-purple) 70%,
+                    var(--accent-blue) 95%);
+            background-size: auto 200%;
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            color: transparent;
+            animation: textShimmer 12s linear infinite;
+            text-shadow: 0 10px 40px rgba(99, 102, 241, 0.05);
+        }
+
+        @keyframes textShimmer {
+            0% {
+                background-position: center 0%;
+            }
+
+            100% {
+                background-position: center 200%;
+            }
+        }
+
+        .landing-state .logo-sub {
+            font-size: 12px;
+            font-weight: 700;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 3px;
+            margin-top: 0px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+        }
+
+        .landing-state .search-section {
+            width: 100%;
+            max-width: 660px;
+            padding: 0 20px;
+            position: relative;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        /* 2. STATE: RESULTS VIEW */
+        .results-state {
+            justify-content: flex-start;
+            align-items: stretch;
+            padding-top: 0;
+        }
+
+        .results-header {
+            border-bottom: 1px solid var(--glass-border);
+            background-color: var(--glass-bg);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            position: sticky;
+            top: 0;
+            z-index: 5;
+            width: 100%;
+        }
+
+        .header-wrapper {
+            display: flex;
+            align-items: center;
+            padding: 10px 1.5rem;
+            gap: 20px;
+            max-width: 1400px;
+            width: 100%;
+            margin: 0 auto;
+            justify-content: center;
+        }
+
+        .logo-column {
+            width: 240px;
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        @media (max-width: 900px) {
+            .logo-column {
+                width: auto;
+            }
+            .header-wrapper {
+                flex-direction: column;
+                gap: 12px;
+                padding: 10px 1rem;
+            }
+        }
+
+        .results-state .logo-container {
+            cursor: default;
+            display: flex;
+            align-items: center;
+        }
+
+        .results-state .logo-title {
+            font-size: 26px;
+            font-weight: 800;
+            letter-spacing: -1px;
+            line-height: 1;
+            background: linear-gradient(to bottom,
+                    var(--accent-blue) 15%,
+                    var(--primary-teal) 45%,
+                    var(--accent-purple) 70%,
+                    var(--accent-blue) 95%);
+            background-size: auto 200%;
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            color: transparent;
+            user-select: none;
+        }
+
+        .results-state .logo-sub {
+            display: none;
+        }
+
+        .results-state .search-section {
+            width: 100%;
+            max-width: 800px;
+            position: relative;
+            margin-bottom: 0;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex: 1;
+        }
+
+        /* Core Search Box Design */
+        .search-box-wrapper {
+            flex: 1;
+            position: relative;
+            z-index: 2;
+            padding: 2px;
+            background: var(--glass-border);
+            border-radius: 22px;
+            box-shadow: var(--card-shadow);
+            transition: var(--transition-fluid);
+        }
+
+        .search-box-wrapper:hover,
+        .search-box-wrapper:focus-within {
+            background: var(--search-glow-border);
+            box-shadow: var(--search-shadow);
+        }
+
+        .search-box {
+            width: 100%;
+            height: 36px;
+            background-color: var(--glass-bg);
+            border: 1px solid var(--glass-border);
+            border-radius: 20px;
+            padding: 0 44px;
+            font-size: 14px;
+            font-family: var(--font-sans);
+            color: var(--text-primary);
+            outline: none;
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            transition: var(--transition-snappy);
+        }
+
+        .search-box::placeholder {
+            font-size: 12px;
+        }
+
+        .search-icon-left {
+            position: absolute;
+            left: 16px;
+            top: 50%;
+            transform: translateY(-50%);
+            fill: var(--text-secondary);
+            width: 18px;
+            height: 18px;
+            pointer-events: auto;
+            cursor: pointer;
+            z-index: 2;
+            transition: var(--transition-snappy);
+        }
+
+        .search-box-wrapper:hover .search-icon-left,
+        .search-box-wrapper:focus-within .search-icon-left {
+            fill: var(--accent-blue);
+            transform: translateY(-50%) scale(1.1);
+        }
+
+        .clear-icon-right {
+            position: absolute;
+            right: 16px;
+            top: 50%;
+            transform: translateY(-50%);
+            fill: var(--text-secondary);
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+            display: none;
+            z-index: 2;
+            transition: var(--transition-snappy);
+        }
+
+        .clear-icon-right:hover {
+            fill: #ef4444;
+            transform: translateY(-50%) scale(1.1);
+        }
+
+        .search-doc-count-badge {
+            position: absolute;
+            right: 8px;
+            top: 50%;
+            transform: translateY(-50%);
+            pointer-events: none;
+            font-size: 11px;
+            color: var(--text-secondary) !important;
+            background-color: transparent !important;
+            border: 1px solid var(--glass-border) !important;
+            border-radius: 12px !important;
+            padding: 2px 8px !important;
+            opacity: 0.65;
+            z-index: 2;
+            transition: opacity 0.2s ease, visibility 0.2s ease;
+            user-select: none;
+            white-space: nowrap;
+        }
+
+        .search-box:not(:placeholder-shown) ~ .search-doc-count-badge {
+            opacity: 0;
+            visibility: hidden;
+        }
+
+        /* Suggestions Autocomplete List */
+        .suggestions-list {
+            position: absolute;
+            top: calc(100% + 8px);
+            left: 0;
+            width: 100%;
+            background-color: var(--drawer-bg);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border);
+            border-radius: 18px;
+            box-shadow: 0 10px 30px var(--card-shadow);
+            list-style: none;
+            overflow: hidden;
+            display: none;
+            z-index: 99;
+            max-height: 280px;
+            overflow-y: auto;
+            padding: 6px;
+        }
+
+        .suggestions-list li {
+            padding: 10px 20px;
+            font-size: 14px;
+            color: var(--text-primary);
+            cursor: pointer;
+            border-radius: 10px;
+            transition: var(--transition-snappy);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .suggestions-list li:hover,
+        .suggestions-list li.active {
+            background-color: var(--glass-hover-bg);
+            color: var(--accent-blue);
+            padding-left: 24px;
+        }
+
+        /* UI Panel: Landing page buttons */
+        .landing-buttons-row {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 16px;
+            margin-top: calc(2rem + 20px);
+        }
+
+        .landing-btn {
+            background-color: var(--glass-bg);
+            border: 1px solid var(--glass-border);
+            color: var(--text-primary);
+            font-size: 14px;
+            padding: 10px 24px;
+            border-radius: 30px;
+            cursor: pointer;
+            font-weight: 600;
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            transition: var(--transition-snappy);
+            box-shadow: var(--card-shadow);
+        }
+
+        .landing-btn:hover {
+            background-color: var(--glass-hover-bg);
+            border-color: var(--glass-hover-border);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px var(--card-shadow);
+        }
+
+        #scanBtn {
+            color: var(--accent-blue) !important;
+            border-color: rgba(59, 130, 246, 0.35) !important;
+            font-weight: 500 !important;
+            transition: box-shadow 0.5s ease, border-color 0.5s ease;
+        }
+
+        #scanBtn:hover {
+            background-color: rgba(59, 130, 246, 0.1) !important;
+            border-color: var(--accent-blue) !important;
+        }
+
+        @keyframes pulseGlow {
+            0% {
+                box-shadow: 0 0 8px rgba(59, 130, 246, 0.4);
+                border-color: rgba(59, 130, 246, 0.5) !important;
+            }
+            20% {
+                box-shadow: 0 0 16px rgba(16, 185, 129, 0.6);
+                border-color: rgba(16, 185, 129, 0.7) !important;
+            }
+            40% {
+                box-shadow: 0 0 16px rgba(245, 158, 11, 0.6);
+                border-color: rgba(245, 158, 11, 0.7) !important;
+            }
+            60% {
+                box-shadow: 0 0 16px rgba(239, 68, 68, 0.6);
+                border-color: rgba(239, 68, 68, 0.7) !important;
+            }
+            80% {
+                box-shadow: 0 0 16px rgba(139, 92, 246, 0.6);
+                border-color: rgba(139, 92, 246, 0.7) !important;
+            }
+            100% {
+                box-shadow: 0 0 8px rgba(59, 130, 246, 0.4);
+                border-color: rgba(59, 130, 246, 0.5) !important;
+            }
+        }
+
+        .glow-breathe {
+            animation: pulseGlow 10s infinite ease-in-out;
+        }
+
+        #docCountBtn,
+        #docCountBtn:disabled {
+            color: var(--text-secondary) !important;
+            border-color: var(--glass-border) !important;
+            opacity: 1 !important;
+            -webkit-text-fill-color: var(--text-secondary) !important;
+            background-color: var(--glass-bg) !important;
+        }
+
+        /* UI PANEL: Results & Filters layout */
+        .results-container {
+            display: grid;
+            grid-template-columns: 240px minmax(0, 800px);
+            flex: 1;
+            padding: 1rem 1.5rem;
+            gap: 20px;
+            overflow-x: hidden;
+            justify-content: center;
+            max-width: 1400px;
+            width: 100%;
+            margin: 0 auto;
+            animation: fadeIn 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        @media (max-width: 900px) {
+            .results-container {
+                grid-template-columns: 1fr;
+                padding: 1rem;
+            }
+
+            .filters-sidebar {
+                width: 100% !important;
+            }
+        }
+
+        /* Search Results Panel */
+        .results-panel {
+            flex: 1;
+            max-width: 800px;
+        }
+
+        .results-info-bar {
+            font-size: 13px;
+            color: var(--text-secondary);
+            margin-bottom: 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-weight: 500;
+        }
+
+        /* Google-style Autocorrect & Did You Mean banner */
+        .spelling-banner {
+            background: rgba(14, 165, 233, 0.05);
+            border: 1px dashed var(--primary-teal);
+            border-radius: 16px;
+            padding: 1rem 1.5rem;
+            font-size: 14px;
+            color: var(--text-primary);
+            margin-bottom: 20px;
+            line-height: 1.6;
+            display: none;
+            animation: fadeIn 0.3s ease;
+            box-shadow: var(--card-shadow);
+        }
+
+        .spelling-banner a {
+            color: var(--accent-blue);
+            text-decoration: none;
+            font-weight: 700;
+            cursor: pointer;
+            border-bottom: 1px solid transparent;
+            transition: var(--transition-snappy);
+        }
+
+        .spelling-banner a:hover {
+            border-color: var(--accent-blue);
+        }
+
+        .answer-panel {
+            background-color: var(--glass-bg);
+            border: 1px solid var(--glass-border);
+            border-radius: var(--radius-inner);
+            padding: 1rem;
+            margin: 0 auto 4px;
+            box-shadow: var(--card-shadow);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            display: none;
+            flex-direction: column;
+            gap: 0.75rem;
+            grid-column: 1 / -1;
+            width: 100%;
+            max-width: 1060px;
+            animation: fadeIn 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .answer-panel.show {
+            display: flex;
+        }
+
+        .answer-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .answer-title {
+            font-size: 0.9rem;
+            font-weight: 800;
+            color: var(--text-primary);
+        }
+
+        .answer-confidence {
+            font-size: 10px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.4px;
+            padding: 4px 10px;
+            border-radius: 20px;
+            border: 1px solid var(--glass-border);
+            color: var(--accent-blue);
+            background: var(--primary-teal-glow);
+            white-space: nowrap;
+        }
+
+        .answer-toggle-btn {
+            font-size: 10px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.4px;
+            padding: 6px 12px;
+            border-radius: 20px;
+            border: 1px solid var(--glass-border);
+            color: var(--accent-blue);
+            background: var(--primary-teal-glow);
+            white-space: nowrap;
+            cursor: pointer;
+            transition: var(--transition-snappy);
+        }
+
+        .answer-toggle-btn:hover {
+            border-color: var(--glass-hover-border);
+            background-color: var(--glass-hover-bg);
+        }
+
+        .answer-main {
+            font-size: 13px;
+            line-height: 1.55;
+            color: var(--text-primary);
+            border-left: 3px solid var(--accent-blue);
+            padding-left: 12px;
+            word-wrap: break-word;
+        }
+
+        .answer-content {
+            display: grid;
+            grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+            gap: 16px;
+            align-items: start;
+        }
+
+        .answer-panel.is-collapsed .answer-content {
+            display: none;
+        }
+
+        .answer-note {
+            font-size: 11px;
+            color: var(--text-secondary);
+            line-height: 1.45;
+        }
+
+        .answer-sources {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .answer-source {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            padding: 8px 10px;
+            border: 1px solid var(--glass-border);
+            border-radius: 12px;
+            background-color: rgba(255, 255, 255, 0.04);
+        }
+
+        [data-theme="dark"] .answer-source {
+            background-color: rgba(255, 255, 255, 0.025);
+        }
+
+        .answer-source-main {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            min-width: 0;
+            flex: 1;
+        }
+
+        .answer-source-title {
+            font-size: 12px;
+            font-weight: 700;
+            color: var(--text-primary);
+            line-height: 1.35;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            margin-bottom: 2px;
+            text-decoration: none;
+            cursor: pointer;
+        }
+
+        .answer-source-title:hover {
+            color: var(--accent-blue);
+        }
+
+        .answer-source-meta {
+            font-size: 10px;
+            color: var(--text-secondary);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .answer-source-actions {
+            display: flex;
+            gap: 6px;
+            flex-shrink: 0;
+        }
+
+        .answer-icon-btn {
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            border: 1px solid var(--glass-border);
+            background: var(--glass-bg);
+            color: var(--text-secondary);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: var(--transition-snappy);
+        }
+
+        .answer-icon-btn:hover {
+            color: var(--accent-blue);
+            border-color: var(--glass-hover-border);
+            background-color: var(--glass-hover-bg);
+        }
+
+        @media (max-width: 640px) {
+            .answer-header,
+            .answer-source {
+                align-items: flex-start;
+                flex-direction: column;
+            }
+
+            .answer-content {
+                grid-template-columns: 1fr;
+            }
+
+            .answer-source-actions {
+                width: 100%;
+                justify-content: flex-end;
+            }
+        }
+
+        .results-list {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        /* Result Item design */
+        .result-item {
+            background-color: var(--glass-bg);
+            border: 1px solid var(--glass-border);
+            padding: 0.6rem 1rem;
+            border-radius: var(--radius-inner);
+            transition: var(--transition-fluid);
+            box-shadow: var(--card-shadow);
+            display: flex;
+            flex-direction: column;
+            gap: 0.3rem;
+            position: relative;
+            overflow: hidden;
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            animation: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .result-item:hover {
+            transform: translateY(-2px);
+            border-color: var(--glass-hover-border);
+            box-shadow: 0 6px 15px var(--card-shadow);
+            background-color: var(--glass-hover-bg);
+        }
+
+        .result-breadcrumb {
+            font-size: 10px;
+            color: var(--text-secondary);
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .result-breadcrumb a {
+            color: var(--text-secondary);
+            text-decoration: none;
+            transition: var(--transition-snappy);
+        }
+
+        .result-breadcrumb a:hover {
+            color: var(--accent-blue);
+        }
+
+        .result-header-row {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 16px;
+            width: 100%;
+        }
+
+        .result-title-container {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: nowrap;
+            flex: 1;
+            min-width: 0;
+        }
+
+        .result-title {
+            font-size: 0.85rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            text-decoration: none;
+            cursor: pointer;
+            line-height: 1.3;
+            transition: var(--transition-snappy);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            flex: 1;
+            min-width: 0;
+        }
+
+        .result-title:hover {
+            color: var(--accent-blue);
+        }
+
+        /* Authority Score Badge */
+        .authority-badge {
+            font-size: 9px;
+            padding: 3px 8px;
+            border-radius: 20px;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+            background-color: var(--primary-teal-glow);
+            color: var(--accent-blue);
+            border: 1px solid rgba(59, 130, 246, 0.15);
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            text-transform: uppercase;
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            flex-shrink: 0;
+        }
+
+        .copy-path-btn {
+            background-color: var(--glass-bg);
+            border: 1px solid var(--glass-border);
+            color: var(--text-secondary);
+            font-size: 10px;
+            font-weight: 600;
+            padding: 6px 12px;
+            border-radius: 20px;
+            cursor: pointer;
+            transition: var(--transition-snappy);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            white-space: nowrap;
+            flex-shrink: 0;
+        }
+
+        .copy-path-btn:hover {
+            color: var(--accent-blue);
+            border-color: var(--glass-hover-border);
+            background-color: var(--glass-hover-bg);
+            box-shadow: 0 4px 10px var(--card-shadow);
+        }
+
+        .result-snippet {
+            font-size: 12px;
+            line-height: 1.4;
+            color: var(--text-secondary);
+            word-wrap: break-word;
+        }
+
+        .highlight-mark {
+            background-color: var(--highlight-bg);
+            color: var(--highlight-text);
+            padding: 0 4px;
+            border-radius: 4px;
+            font-weight: 700;
+        }
+
+        .result-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-top: 4px;
+        }
+
+        .result-tag {
+            font-size: 10px;
+            padding: 3px 10px;
+            background-color: rgba(0, 0, 0, 0.03);
+            border: 1px solid var(--glass-border);
+            border-radius: 20px;
+            color: var(--text-secondary);
+            font-weight: 600;
+            transition: var(--transition-snappy);
+        }
+
+        [data-theme="dark"] .result-tag {
+            background-color: rgba(255, 255, 255, 0.03);
+        }
+
+        .result-tag:hover {
+            background-color: var(--glass-hover-bg);
+            color: var(--accent-blue);
+            border-color: var(--glass-hover-border);
+        }
+
+        /* Sidebar Filters */
+        .filters-sidebar {
+            width: 240px;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            background-color: var(--glass-bg);
+            backdrop-filter: blur(30px);
+            -webkit-backdrop-filter: blur(30px);
+            border: 1px solid var(--glass-border);
+            border-radius: var(--radius-inner);
+            padding: 1.2rem 1rem;
+            height: fit-content;
+            position: sticky;
+            top: 20px;
+            box-shadow: var(--card-shadow);
+        }
+
+        .filter-section {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .filter-title {
+            font-size: 0.7rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            color: var(--text-secondary);
+            border-bottom: 1px solid var(--glass-border);
+            padding-bottom: 8px;
+            margin-bottom: 6px;
+        }
+
+        .filter-option {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 12.5px;
+            color: var(--text-primary);
+            cursor: pointer;
+            padding: 8px 12px;
+            border-radius: 12px;
+            transition: var(--transition-snappy);
+            border: 1px solid transparent;
+            font-weight: 500;
+        }
+
+        .filter-option:hover {
+            background-color: var(--glass-hover-bg);
+            color: var(--accent-blue);
+            transform: translateX(4px);
+        }
+
+        .filter-option.active {
+            background: linear-gradient(90deg, rgba(59, 130, 246, 0.1) 0%, transparent 100%);
+            color: var(--accent-blue);
+            border-color: var(--glass-border);
+            font-weight: 700;
+        }
+
+        .filter-count {
+            font-size: 9px;
+            color: var(--text-secondary);
+            background-color: rgba(0, 0, 0, 0.05);
+            padding: 2px 8px;
+            border-radius: 20px;
+            font-weight: 700;
+        }
+
+        [data-theme="dark"] .filter-count {
+            background-color: rgba(255, 255, 255, 0.08);
+        }
+
+        .filter-select {
+            width: 100%;
+            padding: 8px 12px;
+            border-radius: 12px;
+            background-color: var(--glass-bg);
+            border: 1px solid var(--glass-border);
+            color: var(--text-primary);
+            font-size: 11.5px;
+            font-weight: 600;
+            outline: none;
+            cursor: pointer;
+            transition: var(--transition-snappy);
+            appearance: none;
+            -webkit-appearance: none;
+            background-image: url("data:image/svg+xml;utf8,<svg fill='%23475569' height='24' viewBox='0 0 24 24' width='24' xmlns='http://www.w3.org/2000/svg'><path d='M7 10l5 5 5-5z'/></svg>");
+            background-repeat: no-repeat;
+            background-position: right 10px center;
+            background-size: 18px;
+            padding-right: 32px;
+            font-family: var(--font-sans);
+            box-shadow: var(--card-shadow);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+        }
+
+        [data-theme="dark"] .filter-select {
+            background-image: url("data:image/svg+xml;utf8,<svg fill='%2394a3b8' height='24' viewBox='0 0 24 24' width='24' xmlns='http://www.w3.org/2000/svg'><path d='M7 10l5 5 5-5z'/></svg>");
+        }
+
+        .filter-select:hover {
+            background-color: var(--glass-hover-bg);
+            border-color: var(--glass-hover-border);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px var(--card-shadow);
+        }
+
+        .filter-select:focus {
+            border-color: var(--accent-blue);
+            box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.25);
+        }
+
+        .filter-select option {
+            background-color: var(--drawer-bg);
+            color: var(--text-primary);
+            font-weight: 500;
+        }
+
+        .filter-search-box {
+            width: 100%;
+            height: 34px;
+            background-color: var(--glass-bg);
+            border: 1px solid var(--glass-border);
+            border-radius: 12px;
+            padding: 0 12px;
+            font-size: 11.5px;
+            font-family: var(--font-sans);
+            color: var(--text-primary);
+            outline: none;
+            transition: var(--transition-snappy);
+        }
+
+        .filter-search-box:hover,
+        .filter-search-box:focus {
+            background-color: var(--glass-hover-bg);
+            border-color: var(--accent-blue);
+        }
+
+        /* Pagination & Load More */
+        .load-more-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-top: 32px;
+            margin-bottom: 48px;
+        }
+
+        .pagination-btn {
+            background-color: var(--glass-bg);
+            border: 1px solid var(--glass-border);
+            color: var(--text-primary);
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            cursor: pointer;
+            font-weight: 800;
+            font-size: 13px;
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            transition: var(--transition-snappy);
+            box-shadow: var(--card-shadow);
+        }
+
+        .pagination-btn:hover,
+        .pagination-btn.active {
+            border-color: var(--glass-hover-border);
+            color: var(--accent-blue);
+            background-color: var(--glass-hover-bg);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px var(--card-shadow);
+        }
+
+        .pagination-next-btn {
+            width: auto;
+            min-width: 48px;
+            padding: 0 14px;
+            border-radius: 18px;
+        }
+
+        .end-results-note {
+            margin-top: 14px;
+            text-align: center;
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-secondary);
+        }
+
+        /* Toast notifications */
+        .toast-notification {
+            position: fixed;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%) translateY(100px);
+            background-color: var(--drawer-bg);
+            border: 1px solid var(--glass-border);
+            color: var(--text-primary);
+            padding: 12px 24px;
+            border-radius: 30px;
+            font-size: 14px;
+            font-weight: 600;
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.15);
+            z-index: 999;
+            transition: var(--transition-fluid);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            backdrop-filter: blur(15px);
+            -webkit-backdrop-filter: blur(15px);
+        }
+
+        .toast-notification.show {
+            transform: translateX(-50%) translateY(0);
+        }
+
+        /* Keyframes */
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(15px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* Dashboard/Stats widgets on landing */
+        .stats-dashboard {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 1.5rem;
+            margin-top: 4rem;
+            width: 100%;
+            max-width: 900px;
+            padding: 0 20px;
+        }
+
+        .stat-card {
+            background-color: var(--glass-bg);
+            border: 1px solid var(--glass-border);
+            padding: 1.5rem 1.25rem;
+            border-radius: var(--radius-outer);
+            transition: var(--transition-fluid);
+            box-shadow: var(--card-shadow);
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+            overflow: hidden;
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+        }
+
+        .stat-card:hover {
+            transform: translateY(-6px);
+            border-color: var(--glass-hover-border);
+            box-shadow: 0 12px 30px var(--card-shadow);
+            background-color: var(--glass-hover-bg);
+        }
+
+        .stat-number {
+            font-size: 32px;
+            font-weight: 800;
+            color: var(--accent-blue);
+            margin-bottom: 0.5rem;
+        }
+
+        .stat-label {
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            color: var(--text-secondary);
+            letter-spacing: 1px;
+        }
+
+        /* Footer styling */
+        footer {
+            text-align: center;
+            padding: 24px;
+            font-size: 12px;
+            color: var(--text-secondary);
+            border-top: 1px solid var(--glass-border);
+            background-color: var(--glass-bg);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            margin-top: auto;
+            z-index: 10;
+        }
+
+        /* Hide landing state items when in results mode */
+        .landing-only {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            position: relative;
+        }
+
+        body.show-results .landing-only {
+            display: none;
+        }
+
+        /* Hide results items when in landing mode */
+        .results-only {
+            display: none;
+        }
+
+        body.show-results .results-only {
+            display: flex;
+        }
+
+        body.show-results .results-container {
+            display: grid;
+        }
+
+        body.show-results main {
+            padding-bottom: 0;
+        }
+
+        /* Modal xem nhanh tài liệu */
+        .quick-view-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.4);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            backdrop-filter: blur(15px);
+            -webkit-backdrop-filter: blur(15px);
+            transition: var(--transition-snappy);
+        }
+
+        .quick-view-modal {
+            background-color: var(--drawer-bg);
+            border: 1px solid var(--glass-border);
+            border-radius: var(--radius-outer);
+            padding: 2.5rem;
+            width: 90%;
+            max-width: 850px;
+            max-height: calc(100vh - 40px);
+            height: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.2);
+            color: var(--text-primary);
+            animation: modalScaleIn 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        @keyframes modalScaleIn {
+            from {
+                transform: scale(0.95);
+                opacity: 0;
+            }
+
+            to {
+                transform: scale(1);
+                opacity: 1;
+            }
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--glass-border);
+            padding-bottom: 1rem;
+            gap: 16px;
+        }
+
+        .modal-title-container {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            max-width: 85%;
+            overflow: hidden;
+        }
+
+        .modal-title {
+            font-size: 1.25rem;
+            font-weight: 800;
+            color: var(--text-primary);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            width: 100%;
+        }
+
+        .modal-close-btn {
+            background: var(--glass-bg);
+            border: 1px solid var(--glass-border);
+            color: var(--text-primary);
+            font-size: 1.5rem;
+            cursor: pointer;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            transition: var(--transition-snappy);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .modal-close-btn:hover {
+            background-color: var(--glass-hover-bg);
+            border-color: var(--glass-hover-border);
+            transform: rotate(90deg);
+        }
+
+        .modal-body {
+            flex: 1;
+            overflow-y: auto;
+            padding-right: 8px;
+            line-height: 1.7;
+            font-size: 14.5px;
+            word-wrap: break-word;
+            white-space: pre-wrap;
+            color: var(--text-primary);
+            user-select: text !important;
+            -webkit-user-select: text !important;
+            -ms-user-select: text !important;
+            -moz-user-select: text !important;
+            position: relative;
+        }
+
+        .scrollbar-marker {
+            position: absolute;
+            right: 2px;
+            width: 10px;
+            height: 3px;
+            background-color: #f59e0b;
+            box-shadow: 0 0 4px rgba(245, 158, 11, 0.8);
+            cursor: pointer;
+            pointer-events: auto;
+            z-index: 11;
+            transition: transform 0.1s ease;
+        }
+
+        .scrollbar-marker:hover {
+            transform: scaleX(1.3);
+            background-color: #d97706;
+        }
+
+        .modal-body p {
+            margin-bottom: 1rem;
+        }
+
+        .modal-footer {
+            display: flex;
+            justify-content: flex-end;
+            border-top: 1px solid var(--glass-border);
+            padding-top: 1rem;
+            gap: 12px;
+        }
+
+        /* SVG File Icons style */
+        .file-icon {
+            flex-shrink: 0;
+            width: 22px;
+            height: 22px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .file-icon-pdf {
+            color: #ef4444;
+        }
+
+        .file-icon-word {
+            color: #1a73e8;
+        }
+
+        .file-icon-excel {
+            color: #1e7e34;
+        }
+
+        .file-icon-default {
+            color: var(--text-secondary);
+        }
+
+        /* Webkit scrollbars styling for premium look */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--scrollbar-thumb);
+            border-radius: 4px;
+        }
+
+        /* Liquid Glass Tooltip styling */
+        .scan-tooltip {
+            position: absolute;
+            top: 100%;
+            left: 50%;
+            transform: translateX(-50%) translateY(5px);
+            background-color: var(--drawer-bg);
+            border: 1px solid var(--glass-border);
+            color: var(--text-primary);
+            padding: 10px 20px;
+            border-radius: 20px;
+            font-size: 13.5px;
+            font-weight: 600;
+            box-shadow: 0 8px 25px var(--card-shadow);
+            z-index: 100;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s ease, transform 0.3s ease, visibility 0.3s;
+            backdrop-filter: blur(15px);
+            -webkit-backdrop-filter: blur(15px);
+            pointer-events: none;
+            white-space: nowrap;
+        }
+        .scan-tooltip.show {
+            opacity: 1;
+            visibility: visible;
+            transform: translateX(-50%) translateY(15px);
+        }
+
+        /* Liquid Glass Custom Alert Modal styling */
+        .lg-alert-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.4);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 2000;
+            backdrop-filter: blur(15px);
+            -webkit-backdrop-filter: blur(15px);
+            transition: var(--transition-snappy);
+        }
+        .lg-alert-modal {
+            background-color: var(--drawer-bg);
+            border: 1px solid var(--glass-border);
+            border-radius: var(--radius-outer);
+            padding: 2rem;
+            width: 90%;
+            max-width: 450px;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.2);
+            color: var(--text-primary);
+            animation: modalScaleIn 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        .progress-panel-wrapper {
+            width: 100%;
+            max-width: 500px;
+            background: var(--glass-bg);
+            border: 1px solid var(--glass-border);
+            backdrop-filter: blur(25px);
+            -webkit-backdrop-filter: blur(25px);
+            border-radius: var(--radius-inner);
+            padding: 24px;
+            box-shadow: 0 8px 32px var(--card-shadow);
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+            animation: fadeIn 0.4s ease;
+            transition: var(--transition-fluid);
+        }
+
+        .progress-header-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .progress-title {
+            font-size: 14px;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+
+        .progress-percent {
+            font-size: 16px;
+            font-weight: 800;
+            color: var(--accent-blue);
+            font-family: var(--font-mono);
+        }
+
+        .progress-controls-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .control-btn {
+            background-color: var(--glass-bg);
+            border: 1px solid var(--glass-border);
+            color: var(--text-primary);
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            cursor: pointer;
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            transition: var(--transition-snappy);
+            box-shadow: var(--card-shadow);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0;
+            outline: none;
+            flex-shrink: 0;
+        }
+
+        .control-btn:hover {
+            background-color: var(--glass-hover-bg);
+            border-color: var(--glass-hover-border);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px var(--card-shadow);
+            color: var(--accent-blue);
+        }
+
+        .control-btn:active {
+            transform: translateY(0);
+        }
+
+        .control-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none !important;
+            box-shadow: none !important;
+        }
+
+        .progress-bar-track {
+            width: 100%;
+            height: 10px;
+            background: rgba(0, 0, 0, 0.05);
+            border-radius: 6px;
+            overflow: hidden;
+            border: 1px solid var(--glass-border);
+        }
+
+        [data-theme="dark"] .progress-bar-track {
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .progress-bar-fill {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, var(--accent-blue), var(--accent-purple), var(--accent-pink));
+            box-shadow: 0 0 12px rgba(59, 130, 246, 0.4);
+            border-radius: 6px;
+            transition: width 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .progress-info {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 13px;
+            color: var(--text-secondary);
+            font-weight: 600;
+        }
+
+        .circle-toggle-btn {
+            background: var(--glass-bg);
+            border: 1px solid var(--glass-border);
+            color: var(--text-primary);
+            cursor: pointer;
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: var(--transition-snappy);
+            box-shadow: var(--card-shadow);
+        }
+
+        .circle-toggle-btn:hover {
+            background: var(--glass-hover-bg);
+            border-color: var(--glass-hover-border);
+            transform: scale(1.05);
+        }
+
+        .circle-toggle-btn .chevron-icon {
+            transition: transform 0.3s ease;
+        }
+
+        .circle-toggle-btn.open .chevron-icon {
+            transform: rotate(180deg);
+        }
+
+        .active-files-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            max-height: 0;
+            opacity: 0;
+            overflow: hidden;
+            padding-top: 0;
+            padding-bottom: 0;
+            border-top: 1px dashed transparent;
+            width: 100%;
+            box-sizing: border-box;
+            transition: max-height 0.5s cubic-bezier(0.25, 1, 0.5, 1),
+                        opacity 0.4s ease,
+                        padding 0.5s cubic-bezier(0.25, 1, 0.5, 1),
+                        border-color 0.4s ease;
+        }
+
+        .active-files-list.show {
+            max-height: 240px;
+            opacity: 1;
+            overflow-y: auto;
+            padding-top: 8px;
+            padding-bottom: 8px;
+            border-top: 1px dashed var(--glass-border);
+        }
+
+        .active-file-item {
+            font-size: 12px;
+            color: var(--text-secondary);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 6px 12px;
+            background: rgba(0, 0, 0, 0.02);
+            border-radius: 8px;
+            border: 1px solid rgba(0, 0, 0, 0.03);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-height: 40px;
+            opacity: 1;
+            margin-bottom: 0;
+            width: 100%;
+            box-sizing: border-box;
+            transition: max-height 0.4s cubic-bezier(0.25, 1, 0.5, 1),
+                        opacity 0.3s ease,
+                        padding 0.4s cubic-bezier(0.25, 1, 0.5, 1),
+                        margin 0.4s cubic-bezier(0.25, 1, 0.5, 1),
+                        border-color 0.3s ease,
+                        background-color 0.3s ease;
+        }
+
+        .active-file-name {
+            flex: 1;
+            min-width: 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            margin-right: 8px;
+            text-align: left;
+        }
+
+        [data-theme="dark"] .active-file-item {
+            background: rgba(255, 255, 255, 0.02);
+            border-color: rgba(255, 255, 255, 0.03);
+        }
+
+        .active-file-item.fade-out {
+            opacity: 0.45;
+            mask-image: linear-gradient(to bottom, black 0%, transparent 100%);
+            -webkit-mask-image: linear-gradient(to bottom, black 0%, transparent 100%);
+        }
+
+        .active-file-item.entering {
+            max-height: 0 !important;
+            opacity: 0 !important;
+            padding-top: 0 !important;
+            padding-bottom: 0 !important;
+            margin-top: 0 !important;
+            margin-bottom: 0 !important;
+            border-top-width: 0 !important;
+            border-bottom-width: 0 !important;
+        }
+
+        .active-file-item.exit {
+            max-height: 0 !important;
+            opacity: 0 !important;
+            padding-top: 0 !important;
+            padding-bottom: 0 !important;
+            margin-top: 0 !important;
+            margin-bottom: 0 !important;
+            border-top-width: 0 !important;
+            border-bottom-width: 0 !important;
+            pointer-events: none;
+        }
+        
+        .active-file-status {
+            font-size: 11px;
+            font-weight: 700;
+            padding: 2px 6px;
+            border-radius: 12px;
+            text-transform: uppercase;
+        }
+
+        .active-file-status.working {
+            color: var(--accent-blue);
+            background: rgba(59, 130, 246, 0.1);
+        }
+
+        .active-file-status.pending {
+            color: var(--text-secondary);
+            background: rgba(156, 163, 175, 0.15);
+        }
+
+        /* Liquid Glass Folder Selection Styles */
+        .circle-btn {
+            background-color: var(--glass-bg);
+            border: 1px solid var(--glass-border);
+            color: var(--text-secondary);
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            cursor: pointer;
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            transition: var(--transition-snappy);
+            box-shadow: var(--card-shadow);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0;
+            outline: none;
+        }
+
+        .circle-btn:hover {
+            background-color: var(--glass-hover-bg);
+            border-color: var(--glass-hover-border);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px var(--card-shadow);
+            color: var(--accent-blue);
+        }
+
+        .circle-btn:active {
+            transform: translateY(0);
+        }
+
+        .circle-btn svg {
+            transition: transform 0.2s ease;
+        }
+
+        .circle-btn:hover svg {
+            transform: scale(1.1);
+        }
+
+        .scan-folder-info {
+            display: none !important;
+        }
+    </style>
+</head>
+
+<body data-theme="light">
+    <!-- Gradient mesh background animation effects (Liquid Blobs) -->
+    <div class="blob-container">
+        <div class="blob blob-1"></div>
+        <div class="blob blob-2"></div>
+        <div class="blob blob-3"></div>
+    </div>
+    <!-- Interactive canvas for background particles -->
+    <canvas id="hero-canvas"></canvas>
+
+    <!-- Results Header Sticky Bar -->
+    <div class="results-only results-header results-state">
+        <div class="header-wrapper">
+            <div class="logo-column">
+                <div class="logo-container">
+                    <div class="logo-title">SuperSearch</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <main class="landing-state" id="mainContainer">
+        <!-- 1. LANDING PAGE STATE ONLY -->
+        <div class="landing-only">
+            <div class="logo-container">
+                <div class="logo-title">SuperSearch</div>
+                <div class="logo-sub">Hệ thống tra cứu tài liệu siêu tốc</div>
+            </div>
+        </div>
+
+        <!-- SEARCH AREA (USED IN BOTH STATES) -->
+        <div class="search-section">
+            <div class="search-box-wrapper">
+                <svg class="search-icon-left" viewBox="0 0 24 24" onclick="executeSearch()">
+                    <path
+                        d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z" />
+                </svg>
+                <input type="text" class="search-box" id="searchInput" autocomplete="off"
+                    placeholder="Nhập từ khóa hoặc cụm từ tìm kiếm..." oninput="handleInput()"
+                    onkeydown="handleKeyDown(event)">
+                <span id="docCountBtn" class="search-doc-count-badge">0 tài liệu</span>
+                <svg class="clear-icon-right" id="clearBtn" viewBox="0 0 24 24" onclick="clearSearch()">
+                    <path
+                        d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
+                </svg>
+                <ul class="suggestions-list" id="suggestionsList"></ul>
+            </div>
+            <button class="theme-toggle-btn" id="themeToggleBtn" onclick="toggleTheme()" title="Chuyển đổi giao diện">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-moon"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
+            </button>
+        </div>
+
+        <!-- 1. LANDING PAGE STATE ONLY - BUTTONS & STATS -->
+        <div class="landing-only" id="landingButtons">
+            <div class="landing-buttons-row" id="landingButtonsRow">
+                <button class="landing-btn" onclick="scanAndIndex()" id="scanBtn">Quét và index</button>
+                <button class="circle-btn" onclick="selectFolder()" id="folderBtn" title="Chọn thư mục tài liệu để quét">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-folder-open"><path d="m6 14 1.45-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.55 6a2 2 0 0 1-1.94 1.5H4a2 2 0 0 1-2-2V5c0-1.1.9-2 2-2h3.93a2 2 0 0 1 1.66.9l.82 1.2A2 2 0 0 0 11.93 6H18a2 2 0 0 1 2 2v2"/></svg>
+                </button>
+            </div>
+            <div class="scan-folder-info" id="scanFolderInfo">
+                Thư mục quét: <span id="currentScanFolderText">Mặc định (Thư mục ứng dụng)</span>
+            </div>
+            
+            <!-- Progress Panel Liquid Glass -->
+            <div id="progressContainer" class="progress-panel-wrapper" style="display: none; margin-top: 1.5rem;">
+                <div class="progress-header-row">
+                    <span class="progress-title" id="progressTitleText">Đang quét tài liệu...</span>
+                    <div class="progress-controls-row">
+                        <button id="pauseResumeBtn" class="control-btn" onclick="togglePauseResume()" title="Tạm dừng quét">
+                            <svg id="pauseIcon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>
+                            <svg id="playIcon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="currentColor" style="display: none;"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+                        </button>
+                        <button id="abortBtn" class="control-btn" onclick="abortScan()" title="Hủy bỏ quét">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="4" y="4" width="16" height="16"></rect></svg>
+                        </button>
+                        <span id="progressPercentText" class="progress-percent">0%</span>
+                    </div>
+                </div>
+                <div class="progress-bar-track">
+                    <div id="progressBarFill" class="progress-bar-fill"></div>
+                </div>
+                <div class="progress-info">
+                    <span style="font-size: 12px; font-weight: 700;">Hàng đợi xử lý:</span>
+                    <button id="toggleActiveFilesBtn" onclick="toggleActiveFiles()" class="circle-toggle-btn" title="Xem danh sách file">
+                        <svg class="chevron-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="6 9 12 15 18 9"></polyline>
+                        </svg>
+                    </button>
+                </div>
+                <!-- Danh sách file đang xử lý -->
+                <div id="activeFilesList" class="active-files-list"></div>
+            </div>
+
+            <!-- Tooltip bên dưới 2 nút -->
+            <div class="scan-tooltip" id="scanTooltip">
+                <span id="scanTooltipText">Đang quét...</span>
+            </div>
+        </div>
+
+        <!-- 2. RESULTS VIEW STATE ONLY -->
+        <div class="results-only results-container">
+            <div class="answer-panel" id="answerPanel"></div>
+
+            <!-- Left Side: Filters Sidebar -->
+            <div class="filters-sidebar">
+                <div class="filter-section">
+                    <div class="filter-title">Loại Tài Liệu</div>
+                    <div id="filterDocExt"></div>
+                </div>
+                <div class="filter-section">
+                    <div class="filter-title">NĂM KHỞI TẠO</div>
+                    <div id="filterDocYear"></div>
+                </div>
+                <div class="filter-section">
+                    <div class="filter-title">Lọc kết quả</div>
+                    <input type="text" class="filter-search-box" id="filterResultsInput" placeholder="Gõ từ khóa cần lọc" onkeydown="handleFilterResultsKeyDown(event)">
+                </div>
+            </div>
+
+            <!-- Right Side: Results List -->
+            <div class="results-panel">
+                <!-- Did you mean / Spelling banner -->
+                <div class="spelling-banner" id="spellingBanner"></div>
+
+                <div class="results-info-bar">
+                    <span id="resultsCountText">Khoảng 0 kết quả (0.00 giây)</span>
+                    <span style="cursor: pointer; text-decoration: underline;" onclick="resetToHome()">Quay lại trang
+                        chủ</span>
+                </div>
+
+                <div class="results-list" id="resultsList">
+                    <!-- Results dynamically inserted here -->
+                </div>
+
+                <!-- Pagination -->
+                <div class="load-more-container" id="loadMoreContainer" style="display: none;">
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <footer>
+        <p id="footerScanFolderText">Thư mục quét: Mặc định (Thư mục ứng dụng)</p>
+    </footer>
+
+    <!-- Toast Notification -->
+    <div class="toast-notification" id="toast">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
+        </svg>
+        <span id="toastText">Đã sao chép đường dẫn thành công!</span>
+    </div>
+
+    <!-- Cửa sổ xem nhanh tài liệu (Modal Popup) -->
+    <div class="quick-view-overlay" id="quickViewOverlay" onclick="closeQuickView(event)">
+        <div class="quick-view-modal" onclick="event.stopPropagation()">
+            <div class="modal-header">
+                <div class="modal-title" id="modalTitle">Tiêu đề tài liệu</div>
+                <button class="modal-close-btn" onclick="closeQuickView()">&times;</button>
+            </div>
+            <div style="position: relative; display: flex; width: 100%; flex: 1; overflow: hidden;">
+                <div class="modal-body" id="modalBody">
+                    <!-- Nội dung văn bản Markdown -->
+                </div>
+                <div id="scrollbarMarkerTrack" style="position: absolute; right: 0; top: 0; width: 14px; height: 100%; z-index: 10; background: transparent; pointer-events: none;"></div>
+            </div>
+            <div class="modal-footer">
+                <button class="landing-btn" onclick="closeQuickView()">Đóng</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Cửa sổ Alert tùy biến phong cách Liquid Glass (Modal Popup) -->
+    <div class="lg-alert-overlay" id="lgAlertOverlay" onclick="closeLgAlert(event)">
+        <div class="lg-alert-modal" onclick="event.stopPropagation()">
+            <div class="modal-header" style="border-bottom: 1px solid var(--glass-border); padding-bottom: 0.75rem;">
+                <div class="modal-title" id="lgAlertTitle" style="font-size: 1.1rem; font-weight: 700;">Thông báo</div>
+                <button class="modal-close-btn" onclick="closeLgAlert()">&times;</button>
+            </div>
+            <div class="modal-body" id="lgAlertBody" style="font-size: 14.5px; line-height: 1.6; word-wrap: break-word; white-space: pre-wrap; color: var(--text-primary);">
+                <!-- Nội dung thông báo -->
+            </div>
+            <div class="modal-footer" style="border-top: 1px solid var(--glass-border); padding-top: 0.75rem; display: flex; justify-content: flex-end;">
+                <button class="landing-btn" style="color: var(--accent-blue) !important; border-color: rgba(59, 130, 246, 0.35) !important;" onclick="closeLgAlert()">Xác nhận</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Load Search Database -->
+    <script src="search_db.js" charset="utf-8"></script>
+    <script>
+        // Active search parameters
+        let activeQuery = "";
+        let autocorrectEnabled = true;
+
+        let selectedDocExt = "";
+        let selectedDocYear = "";
+        let selectedDomain = "";
+        let filterQuery = "";
+        let averageDocLength = 500;
+        let searchIndexReady = false;
+        let totalSearchDocs = 0;
+        let searchDocFreq = new Map();
+        let searchTokenDocs = new Map();
+        let titleVocabularySet = new Set();
+        let vocabularyByLength = new Map();
+        let currentMatchedDocs = [];
+
+        let filteredResults = [];
+        let currentPage = 1;
+        const RESULTS_PER_PAGE = 15;
+
+        // Auto suggestions index selection
+        let activeSuggestionIndex = -1;
+        let titleVocabulary = [];
+
+        const TOKEN_PATTERN = /[a-z0-9]+(?:[._\/-][a-z0-9]+)*/g;
+        const VT_LETTERS_STR = "a-zA-Z0-9áàảãạăắằẳẵặâấầẩẫậéèẻẽẹêếềểễệíìỉĩịóòỏõọôốồổỗộơớờởỡợúùủũụưứừửữựýỳỷỹỵđĐ";
+        const VT_LETTERS_CLASS = "[" + VT_LETTERS_STR + "]";
+        const STOP_WORDS = new Set([
+            "with", "of", "the", "and", "at", "for", "a",
+            "va", "cua", "nhung", "cac", "cho", "trong", "tren", "la", "duoc",
+            "mot", "nhieu", "ve", "khi", "khong"
+        ]);
+        const PROTECTED_SPELLCHECK_WORDS = new Set(["it", "hr", "kpi", "okr", "hsse", "hsseq", "cict"]);
+        const UNKNOWN_YEAR_LABEL = "Không rõ năm";
+        const SOURCE_LABELS = {
+            formal_document: "Tài liệu chính thống",
+            chat_screenshot: "Ảnh chat",
+            image_ocr: "Ảnh OCR",
+            ui_screenshot: "Ảnh giao diện",
+            low_confidence_ocr: "OCR thấp"
+        };
+        const DIACRITIC_GROUPS = {
+            a: "áàảãạăắằẳẵặâấầẩẫậ",
+            e: "éèẻẽẹêếềểễệ",
+            i: "íìỉĩị",
+            o: "óòỏõọôốồổỗộơớờởỡợ",
+            u: "úùủũụưứừửữự",
+            y: "ýỳỷỹỵ",
+            d: "đ"
+        };
+        const DIACRITIC_CHAR_MAP = {};
+        Object.keys(DIACRITIC_GROUPS).forEach(base => {
+            DIACRITIC_GROUPS[base].split("").forEach(char => {
+                DIACRITIC_CHAR_MAP[char] = base;
+                DIACRITIC_CHAR_MAP[char.toUpperCase()] = base;
+            });
+        });
+
+        function uniqueTokens(tokens) {
+            const seen = new Set();
+            const result = [];
+            tokens.forEach(token => {
+                if (!token || seen.has(token)) return;
+                seen.add(token);
+                result.push(token);
+            });
+            return result;
+        }
+
+        function expandCompoundToken(token) {
+            const parts = token.split(/[._\/-]+/).filter(part => part.length > 1);
+            return parts.length > 1 ? [token, ...parts] : [token];
+        }
+
+        function rawTokenize(text) {
+            const cleanText = removeDiacritics(String(text || ""));
+            return cleanText.match(TOKEN_PATTERN) || [];
+        }
+
+        function tokenize(text) {
+            const cleanText = removeDiacritics(String(text || ""));
+            const matches = cleanText.match(TOKEN_PATTERN) || [];
+            const tokens = [];
+            matches.forEach(token => {
+                expandCompoundToken(token).forEach(part => tokens.push(part));
+            });
+            return tokens;
+        }
+
+        function escapeRegex(str) {
+            return String(str || "").replace(/[-\/\\^$*+?.()|[\]{}]/g, "\\$&");
+        }
+
+        function buildAccentInsensitivePattern(word) {
+            let pattern = "";
+            const cleanWord = removeDiacritics(word);
+            for (let i = 0; i < cleanWord.length; i++) {
+                const char = cleanWord.charAt(i);
+                if (char === "a") pattern += "[aáàảãạăắằẳẵặâấầẩẫậ]";
+                else if (char === "e") pattern += "[eéèẻẽẹêếềểễệ]";
+                else if (char === "i") pattern += "[iíìỉĩị]";
+                else if (char === "o") pattern += "[oóòỏõọôốồổỗộơớờởỡợ]";
+                else if (char === "u") pattern += "[uúùủũụưứừửữự]";
+                else if (char === "y") pattern += "[yýỳỷỹỵ]";
+                else if (char === "d") pattern += "[dđ]";
+                else pattern += escapeRegex(char);
+            }
+            return pattern;
+        }
+
+        function filterSearchWords(queryWords) {
+            if (queryWords.length <= 1) return queryWords;
+            const normalized = uniqueTokens(queryWords.flatMap(w => tokenize(w)));
+            const filtered = normalized.filter(w => w.length > 1 && !STOP_WORDS.has(w));
+            return filtered.length > 0 ? filtered : queryWords;
+        }
+
+        // Initialize App
+        window.onload = function () {
+            // Load theme from localStorage
+            const savedTheme = localStorage.getItem("theme") || "light";
+            setTheme(savedTheme);
+
+            // Build stats on landing page
+            buildDashboardStats();
+
+            // Build spelling check vocabulary
+            buildVocabulary();
+
+            // Calculate document lengths and average length
+            if (typeof SEARCH_DB !== "undefined" && SEARCH_DB.length > 0) {
+                let totalLen = 0;
+                SEARCH_DB.forEach(doc => {
+                    if (!doc.wordCount) {
+                        doc.wordCount = doc.content ? doc.content.split(/\s+/).length : 1;
+                    }
+                    totalLen += doc.wordCount;
+                });
+                averageDocLength = totalLen / SEARCH_DB.length;
+            }
+
+            // Focus search input
+            document.getElementById("searchInput").focus();
+
+            // Resize event to align sidebar
+            window.addEventListener('resize', alignSidebar);
+
+            // Load scan folder config
+            if (window.pywebview) {
+                initFolderConfig();
+            } else {
+                window.addEventListener('pywebviewready', initFolderConfig);
+            }
+        };
+
+        function toggleTheme() {
+            const currentTheme = document.body.getAttribute("data-theme");
+            const newTheme = currentTheme === "dark" ? "light" : "dark";
+            setTheme(newTheme);
+        }
+
+        function setTheme(theme) {
+            document.body.setAttribute("data-theme", theme);
+            localStorage.setItem("theme", theme);
+            const btn = document.getElementById("themeToggleBtn");
+            if (!btn) return;
+            if (theme === "dark") {
+                btn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-sun"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>`;
+            } else {
+                btn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-moon"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>`;
+            }
+        }
+
+        // Vietnamese Accent/Diacritic Removal
+        function removeDiacritics(str) {
+            if (!str) return "";
+            return String(str).replace(/[áàảãạăắằẳẵặâấầẩẫậéèẻẽẹêếềểễệíìỉĩịóòỏõọôốồổỗộơớờởỡợúùủũụưứừửữựýỳỷỹỵđÁÀẢÃẠĂẮẰẲẴẶÂẤẦẨẪẬÉÈẺẼẸÊẾỀỂỄỆÍÌỈĨỊÓÒỎÕỌÔỐỒỔỖỘƠỚỜỞỠỢÚÙỦŨỤƯỨỪỬỮỰÝỲỶỸỴĐ]/g, char => DIACRITIC_CHAR_MAP[char] || char).toLowerCase();
+        }
+
+        // Build stats on landing page
+        function buildDashboardStats() {
+            if (typeof SEARCH_DB === "undefined") return;
+
+            const total = SEARCH_DB.length;
+            const docCountBtn = document.getElementById("docCountBtn");
+            if (docCountBtn) {
+                docCountBtn.textContent = `${total} tài liệu`;
+            }
+        }
+
+        function createFrequencyMap(tokens) {
+            const freq = Object.create(null);
+            tokens.forEach(token => {
+                freq[token] = (freq[token] || 0) + 1;
+            });
+            return freq;
+        }
+
+        function prepareDocumentCache(doc) {
+            if (doc._searchCache) return doc._searchCache;
+
+            const titleText = doc.title_clean || removeDiacritics(doc.title);
+            const contentText = doc.content_clean || removeDiacritics(doc.content);
+            const metadataText = removeDiacritics(`${doc.domain || ""} ${doc.doc_type || ""} ${doc.language || ""} ${doc.year || ""}`);
+            const titleTokens = tokenize(titleText);
+            const contentTokens = tokenize(contentText);
+            const metadataTokens = tokenize(metadataText);
+            const rawContentTokens = rawTokenize(contentText);
+            const termFreq = createFrequencyMap(contentTokens);
+
+            doc._searchCache = {
+                titleText,
+                contentText,
+                metadataText,
+                titleTokenSet: new Set(titleTokens),
+                metadataTokenSet: new Set(metadataTokens),
+                termFreq,
+                termKeys: Object.keys(termFreq),
+                tokenLength: rawContentTokens.length || doc.wordCount || 1,
+                contentTokens: contentTokens
+            };
+            return doc._searchCache;
+        }
+
+        function addVocabularyToken(token) {
+            if (!token || token.length <= 2 || STOP_WORDS.has(token)) return;
+            if (titleVocabularySet.has(token)) return;
+            titleVocabularySet.add(token);
+            const len = token.length;
+            if (!vocabularyByLength.has(len)) {
+                vocabularyByLength.set(len, []);
+            }
+            vocabularyByLength.get(len).push(token);
+        }
+
+        function buildSearchIndex() {
+            if (typeof SEARCH_DB === "undefined") return;
+
+            searchDocFreq = new Map();
+            searchTokenDocs = new Map();
+            titleVocabularySet = new Set();
+            vocabularyByLength = new Map();
+            totalSearchDocs = SEARCH_DB.length;
+
+            let totalLen = 0;
+            SEARCH_DB.forEach((doc, docIndex) => {
+                doc._searchCache = null;
+                const cache = prepareDocumentCache(doc);
+                totalLen += cache.tokenLength;
+
+                const seenTokens = new Set([
+                    ...cache.titleTokenSet,
+                    ...cache.metadataTokenSet,
+                    ...cache.termKeys
+                ]);
+                seenTokens.forEach(token => {
+                    searchDocFreq.set(token, (searchDocFreq.get(token) || 0) + 1);
+                    if (!searchTokenDocs.has(token)) {
+                        searchTokenDocs.set(token, []);
+                    }
+                    searchTokenDocs.get(token).push(docIndex);
+                });
+                cache.titleTokenSet.forEach(addVocabularyToken);
+                cache.metadataTokenSet.forEach(addVocabularyToken);
+            });
+
+            titleVocabulary = Array.from(titleVocabularySet);
+            averageDocLength = totalSearchDocs > 0 ? totalLen / totalSearchDocs : 500;
+            searchIndexReady = true;
+        }
+
+        // Build vocabulary dictionary and production search cache.
+        function buildVocabulary() {
+            buildSearchIndex();
+        }
+
+        // Levenshtein Distance Calculator
+        function levenshteinDistance(a, b) {
+            const matrix = [];
+            for (let i = 0; i <= b.length; i++) {
+                matrix[i] = [i];
+            }
+            for (let j = 0; j <= a.length; j++) {
+                matrix[0][j] = j;
+            }
+            for (let i = 1; i <= b.length; i++) {
+                for (let j = 1; j <= a.length; j++) {
+                    if (b.charAt(i - 1) === a.charAt(j - 1)) {
+                        matrix[i][j] = matrix[i - 1][j - 1];
+                    } else {
+                        matrix[i][j] = Math.min(
+                            matrix[i - 1][j - 1] + 1, // substitution
+                            matrix[i][j - 1] + 1,     // insertion
+                            matrix[i - 1][j] + 1      // deletion
+                        );
+                    }
+                }
+            }
+            return matrix[b.length][a.length];
+        }
+
+        // Spelling correction helper
+        function getSpellingCorrection(query) {
+            if (!query) return null;
+            if (!searchIndexReady) buildSearchIndex();
+            const queryWords = tokenize(query).filter(w => w.length > 0);
+
+            let correctedQueryWords = [];
+            let isCorrected = false;
+
+            queryWords.forEach(word => {
+                if (word.length <= 3 || /[0-9._\/-]/.test(word) || PROTECTED_SPELLCHECK_WORDS.has(word)) {
+                    correctedQueryWords.push(word);
+                    return;
+                }
+
+                if (titleVocabularySet.has(word)) {
+                    correctedQueryWords.push(word);
+                    return;
+                }
+
+                let closestWord = word;
+                let minDistance = 99;
+                const candidates = [];
+                for (let len = Math.max(3, word.length - 2); len <= word.length + 2; len++) {
+                    if (vocabularyByLength.has(len)) {
+                        candidates.push(...vocabularyByLength.get(len));
+                    }
+                }
+
+                const filteredCandidates = candidates.filter(vocabWord => {
+                    return vocabWord.charAt(0) === word.charAt(0) || vocabWord.charAt(1) === word.charAt(1);
+                });
+
+                filteredCandidates.slice(0, 300).forEach(vocabWord => {
+                    const dist = levenshteinDistance(word, vocabWord);
+                    if (dist < minDistance) {
+                        minDistance = dist;
+                        closestWord = vocabWord;
+                    }
+                });
+
+                const maxAllowedEdit = word.length <= 5 ? 1 : 2;
+                if (minDistance <= maxAllowedEdit && closestWord !== word) {
+                    correctedQueryWords.push(closestWord);
+                    isCorrected = true;
+                } else {
+                    correctedQueryWords.push(word);
+                }
+            });
+
+            return isCorrected ? correctedQueryWords.join(" ") : null;
+        }
+
+        function quickFilterDomain(keyword) {
+            const input = document.getElementById("searchInput");
+            if (keyword === "IT") {
+                selectedDomain = "IT (Công nghệ thông tin)";
+                input.value = "Chính sách IT";
+            } else if (keyword === "HSSE") {
+                selectedDomain = "HSSE (An toàn, Môi trường, An ninh)";
+                input.value = "Quy trình an toàn";
+            } else if (keyword === "KPI") {
+                selectedDomain = "KPI & OKR (Quản trị hiệu suất)";
+                input.value = "Đánh giá hiệu quả";
+            }
+            executeSearch(false, true);
+        }
+
+        function scanAndIndex() {
+            const btn = document.getElementById("scanBtn");
+            if (!btn) return;
+
+            const originalText = btn.textContent;
+            btn.textContent = "Đang quét...";
+            btn.disabled = true;
+
+            const mainContainer = document.getElementById("mainContainer");
+            if (mainContainer) mainContainer.classList.add("scanning");
+
+            // Reset trạng thái các nút điều khiển quét
+            isPaused = false;
+            const pauseIcon = document.getElementById("pauseIcon");
+            const playIcon = document.getElementById("playIcon");
+            const pauseBtn = document.getElementById("pauseResumeBtn");
+            const abortBtn = document.getElementById("abortBtn");
+            const progressTitle = document.getElementById("progressTitleText");
+            
+            if (pauseIcon) pauseIcon.style.display = "block";
+            if (playIcon) playIcon.style.display = "none";
+            if (pauseBtn) {
+                pauseBtn.disabled = false;
+                pauseBtn.title = "Tạm dừng quét";
+            }
+            if (abortBtn) abortBtn.disabled = false;
+            if (progressTitle) progressTitle.textContent = "Đang quét tài liệu...";
+
+            // Hiển thị thanh tiến trình Liquid Glass
+            const buttonsRow = document.getElementById("landingButtonsRow");
+            const progressContainer = document.getElementById("progressContainer");
+            const activeFilesList = document.getElementById("activeFilesList");
+            const toggleBtn = document.getElementById("toggleActiveFilesBtn");
+
+            if (buttonsRow) buttonsRow.style.display = "none";
+            if (progressContainer) {
+                progressContainer.style.display = "flex";
+                // Reset progress
+                updateScanProgress(0, []);
+                if (activeFilesList) activeFilesList.classList.add("show");
+                if (toggleBtn) toggleBtn.classList.add("open");
+            }
+
+            if (window.pywebview && window.pywebview.api && window.pywebview.api.scan_and_index) {
+                window.pywebview.api.scan_and_index().then(function (result) {
+                    if (result.success) {
+                        updateScanProgress(100, []);
+                        showScanTooltip(`Đã quét xong! Thêm mới ${result.new_files} file. Tổng cộng ${result.total_entries} tài liệu.`);
+                        setTimeout(() => {
+                            location.reload();
+                        }, 3500);
+                    } else {
+                        if (mainContainer) mainContainer.classList.remove("scanning");
+                        if (buttonsRow) buttonsRow.style.display = "flex";
+                        if (progressContainer) progressContainer.style.display = "none";
+                        btn.textContent = originalText;
+                        btn.disabled = false;
+                        
+                        if (result.error && result.error.includes("hủy quét")) {
+                            showScanTooltip("Đã hủy quét tài liệu.");
+                            setTimeout(() => {
+                                showScanTooltip("");
+                            }, 3000);
+                        } else {
+                            alert("Lỗi khi quét: " + result.error);
+                        }
+                    }
+                }).catch(function (err) {
+                    if (mainContainer) mainContainer.classList.remove("scanning");
+                    if (buttonsRow) buttonsRow.style.display = "flex";
+                    if (progressContainer) progressContainer.style.display = "none";
+                    btn.textContent = originalText;
+                    btn.disabled = false;
+                    alert("Lỗi kết nối Python: " + err);
+                });
+            } else {
+                if (mainContainer) mainContainer.classList.remove("scanning");
+                if (buttonsRow) buttonsRow.style.display = "flex";
+                if (progressContainer) progressContainer.style.display = "none";
+                btn.textContent = originalText;
+                btn.disabled = false;
+                alert("Tính năng quét chỉ khả dụng khi chạy trên ứng dụng SuperSearch (EXE).");
+            }
+        }
+
+        // Nhận dữ liệu tiến trình từ Python và cập nhật UI
+        function updateScanProgress(percent, activeFiles) {
+            const bar = document.getElementById("progressBarFill");
+            const text = document.getElementById("progressPercentText");
+            if (bar) bar.style.width = percent + "%";
+            if (text) text.textContent = percent + "%";
+
+            const listContainer = document.getElementById("activeFilesList");
+            if (!listContainer) return;
+
+            if (!activeFiles || activeFiles.length === 0) {
+                let htmlContent = "";
+                if (percent < 100) {
+                    htmlContent = `
+                        <div style="font-size: 13px; color: var(--text-secondary); text-align: center; padding: 8px 0; width: 100%;">
+                            Đang chuẩn bị danh sách file...
+                        </div>
+                    `;
+                } else {
+                    htmlContent = `
+                        <div style="font-size: 13px; color: var(--accent-blue); text-align: center; padding: 8px 0; font-weight: 700; width: 100%;">
+                            Đang cập nhật cơ sở dữ liệu...
+                        </div>
+                    `;
+                }
+                listContainer.innerHTML = htmlContent;
+                return;
+            }
+
+            const msgDiv = listContainer.querySelector("div[style*='text-align: center']");
+            if (msgDiv) {
+                listContainer.removeChild(msgDiv);
+            }
+
+            // 1. Gắn class exit cho các file đã hoàn thành (không còn trong activeFiles)
+            const currentItems = Array.from(listContainer.querySelectorAll(".active-file-item:not(.exit)"));
+            currentItems.forEach(item => {
+                const filename = item.getAttribute("data-filename");
+                const stillActive = activeFiles.some(f => (typeof f === 'string' ? f === filename : f.filename === filename));
+                if (!stillActive) {
+                    item.classList.add("exit");
+                    setTimeout(() => {
+                        if (item.parentNode === listContainer) {
+                            listContainer.removeChild(item);
+                        }
+                    }, 400);
+                }
+            });
+
+            // 2. Thêm mới các file đang xử lý
+            activeFiles.forEach((fileObj, index) => {
+                const file = typeof fileObj === 'string' ? fileObj : fileObj.filename;
+                const status = typeof fileObj === 'string' ? "Working" : fileObj.status; // "Working" hoặc "Pending"
+
+                let item = listContainer.querySelector(`.active-file-item[data-filename="${CSS.escape(file)}"]`);
+                if (!item) {
+                    item = document.createElement("div");
+                    item.className = "active-file-item entering";
+                    item.setAttribute("data-filename", file);
+                    item.innerHTML = `
+                        <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 80%;" title="${file}">${file}</span>
+                        <span class="active-file-status ${status.toLowerCase()}">${status}</span>
+                    `;
+                    listContainer.appendChild(item);
+                    
+                    requestAnimationFrame(() => {
+                        requestAnimationFrame(() => {
+                            item.classList.remove("entering");
+                        });
+                    });
+                } else {
+                    // Cập nhật trạng thái tag
+                    const statusSpan = item.querySelector(".active-file-status");
+                    if (statusSpan && statusSpan.textContent !== status) {
+                        statusSpan.className = `active-file-status ${status.toLowerCase()}`;
+                        statusSpan.textContent = status;
+                    }
+                }
+                
+                if (index === 3) {
+                    item.classList.add("fade-out");
+                } else {
+                    item.classList.remove("fade-out");
+                }
+            });
+        }
+
+        // Ẩn/hiển thị danh sách file đang quét
+        function toggleActiveFiles() {
+            const list = document.getElementById("activeFilesList");
+            const btn = document.getElementById("toggleActiveFilesBtn");
+            if (list && btn) {
+                list.classList.toggle("show");
+                btn.classList.toggle("open");
+            }
+        }
+
+        // Suggestions autocomplete handler
+        let suggestTimeout = null;
+        function handleInput() {
+            const query = document.getElementById("searchInput").value.trim();
+            const clearBtn = document.getElementById("clearBtn");
+            const suggestionsList = document.getElementById("suggestionsList");
+
+            if (query.length > 0) {
+                clearBtn.style.display = "block";
+                if (suggestTimeout) clearTimeout(suggestTimeout);
+                suggestTimeout = setTimeout(() => {
+                    showSuggestions(query);
+                }, 200);
+            } else {
+                if (suggestTimeout) clearTimeout(suggestTimeout);
+                clearBtn.style.display = "none";
+                suggestionsList.style.display = "none";
+            }
+        }
+
+        function clearSearch() {
+            document.getElementById("searchInput").value = "";
+            document.getElementById("clearBtn").style.display = "none";
+            document.getElementById("suggestionsList").style.display = "none";
+            document.getElementById("searchInput").focus();
+        }
+
+        function showSuggestions(query) {
+            if (typeof SEARCH_DB === "undefined") return;
+
+            const cleanQuery = removeDiacritics(query);
+            const queryTokens = filterSearchWords(tokenize(cleanQuery));
+            const matches = SEARCH_DB.filter(doc => {
+                const cleanTitle = doc.title_clean || removeDiacritics(doc.title);
+                if (cleanTitle.includes(cleanQuery)) return true;
+                return queryTokens.length > 0 && queryTokens.every(token => cleanTitle.includes(token));
+            }).slice(0, 8);
+
+            const suggestionsList = document.getElementById("suggestionsList");
+            suggestionsList.innerHTML = "";
+            activeSuggestionIndex = -1;
+
+            if (matches.length > 0) {
+                matches.forEach((doc, idx) => {
+                    const li = document.createElement("li");
+                    li.textContent = doc.title;
+                    li.onclick = () => {
+                        document.getElementById("searchInput").value = doc.title;
+                        suggestionsList.style.display = "none";
+                        executeSearch();
+                    };
+                    suggestionsList.appendChild(li);
+                });
+                suggestionsList.style.display = "block";
+            } else {
+                suggestionsList.style.display = "none";
+            }
+        }
+
+        function handleKeyDown(event) {
+            const list = document.getElementById("suggestionsList");
+            const items = list.getElementsByTagName("li");
+
+            if (list.style.display === "block" && items.length > 0) {
+                if (event.key === "ArrowDown") {
+                    event.preventDefault();
+                    activeSuggestionIndex = (activeSuggestionIndex + 1) % items.length;
+                    updateSuggestionActiveState(items);
+                } else if (event.key === "ArrowUp") {
+                    event.preventDefault();
+                    activeSuggestionIndex = (activeSuggestionIndex - 1 + items.length) % items.length;
+                    updateSuggestionActiveState(items);
+                } else if (event.key === "Enter") {
+                    if (activeSuggestionIndex !== -1) {
+                        event.preventDefault();
+                        items[activeSuggestionIndex].click();
+                    } else {
+                        list.style.display = "none";
+                        executeSearch();
+                    }
+                } else if (event.key === "Escape") {
+                    list.style.display = "none";
+                }
+            } else if (event.key === "Enter") {
+                executeSearch();
+            }
+        }
+
+        function updateSuggestionActiveState(items) {
+            for (let i = 0; i < items.length; i++) {
+                if (i === activeSuggestionIndex) {
+                    items[i].classList.add("active");
+                    items[i].scrollIntoView({ block: 'nearest' });
+                    document.getElementById("searchInput").value = items[i].textContent;
+                } else {
+                    items[i].classList.remove("active");
+                }
+            }
+        }
+
+        document.addEventListener("click", function (e) {
+            if (e.target.id !== "searchInput" && e.target.id !== "suggestionsList") {
+                document.getElementById("suggestionsList").style.display = "none";
+            }
+        });
+
+        // Word Span query Proximity Bonus (Min-Span)
+        function getMinSpanProximityBonus(docCache, queryWords) {
+            if (queryWords.length < 2) return 0;
+
+            const wordsInDoc = docCache.contentTokens || tokenize(docCache.contentText);
+            const uniqueQueryWords = uniqueTokens(queryWords);
+            const queryIndexByWord = new Map();
+            uniqueQueryWords.forEach((word, idx) => queryIndexByWord.set(word, idx));
+
+            const wordPositions = uniqueQueryWords.map(() => []);
+            wordsInDoc.forEach((docWord, idx) => {
+                const queryIndex = queryIndexByWord.get(docWord);
+                if (queryIndex !== undefined) {
+                    wordPositions[queryIndex].push(idx);
+                }
+            });
+
+            const matchedPositions = wordPositions.filter(positions => positions.length > 0);
+            const matchedWordCount = matchedPositions.length;
+            if (matchedWordCount < 2) return 0;
+
+            let minSpan = Infinity;
+            const indices = new Array(matchedWordCount).fill(0);
+            
+            while (true) {
+                let minVal = Infinity;
+                let maxVal = -Infinity;
+                let minIdx = -1;
+                
+                for (let i = 0; i < matchedWordCount; i++) {
+                    const val = matchedPositions[i][indices[i]];
+                    if (val < minVal) {
+                        minVal = val;
+                        minIdx = i;
+                    }
+                    if (val > maxVal) {
+                        maxVal = val;
+                    }
+                }
+                
+                const currentSpan = maxVal - minVal + 1;
+                if (currentSpan < minSpan) {
+                    minSpan = currentSpan;
+                }
+                
+                indices[minIdx]++;
+                if (indices[minIdx] >= matchedPositions[minIdx].length) {
+                    break;
+                }
+            }
+
+            const density = matchedWordCount / minSpan;
+            const matchRatio = matchedWordCount / uniqueQueryWords.length;
+            return matchRatio * density * 250;
+        }
+
+        function executeSearch(forceOriginal = false, keepFilters = false) {
+            const query = document.getElementById("searchInput").value.trim();
+            if (!query) return;
+
+            document.getElementById("suggestionsList").style.display = "none";
+
+            // Reset filters if query changes
+            if (query !== activeQuery) {
+                if (!keepFilters) {
+                    selectedDocExt = "";
+                    selectedDocYear = "";
+                    selectedDomain = "";
+                    filterQuery = "";
+                    const filterInput = document.getElementById("filterResultsInput");
+                    if (filterInput) filterInput.value = "";
+                }
+            }
+
+            // Switch to Results UI State
+            document.body.classList.add("show-results");
+            const main = document.getElementById("mainContainer");
+            main.className = "results-state";
+
+            // Di chuyển search bar vào kết quả header
+            const searchSection = document.querySelector('.search-section');
+            const headerWrapper = document.querySelector('.header-wrapper');
+            if (searchSection && headerWrapper && !headerWrapper.contains(searchSection)) {
+                headerWrapper.appendChild(searchSection);
+            }
+
+            if (forceOriginal) {
+                autocorrectEnabled = false;
+            }
+
+            activeQuery = query;
+            performSearchFilterAndRender();
+        }
+
+        function matchesInOrder(text, words) {
+            if (words.length < 2) return false;
+            const escaped = words.map(escapeRegex);
+            const pattern = escaped.join('.*?');
+            const regex = new RegExp(pattern, 'i');
+            return regex.test(text);
+        }
+
+        function hasInOrderSentenceMatch(contentCleanedLower, queryWords) {
+            if (queryWords.length < 2) return false;
+            const sentences = contentCleanedLower.split(/[.!?\n]/);
+            return sentences.some(sentence => matchesInOrder(sentence, queryWords));
+        }
+
+        function isWholeWord(text, pos, wordLen) {
+            const prevChar = pos > 0 ? text.charAt(pos - 1) : ' ';
+            const nextChar = pos + wordLen < text.length ? text.charAt(pos + wordLen) : ' ';
+            const vtLetters = /[a-zA-Z0-9áàảãạăắằẳẵặâấầẩẫậéèẻẽẹêếềểễệíìỉĩịóòỏõọôốồổỗộơớờởỡợúùủũụưứừửữựýỳỷỹỵđĐ]/;
+            return !vtLetters.test(prevChar) && !vtLetters.test(nextChar);
+        }
+
+        function findWholeWord(text, word) {
+            if (!text || !word) return -1;
+            let pos = text.indexOf(word);
+            while (pos !== -1) {
+                if (isWholeWord(text, pos, word.length)) return pos;
+                pos = text.indexOf(word, pos + 1);
+            }
+            return -1;
+        }
+
+        function includesWholeWord(text, word) {
+            return findWholeWord(text, word) !== -1;
+        }
+
+        function getNormalizedYear(yearValue) {
+            if (yearValue === undefined || yearValue === null || yearValue === "" || yearValue === "N/A") {
+                return UNKNOWN_YEAR_LABEL;
+            }
+            const yearNumber = Number(yearValue);
+            if (!Number.isFinite(yearNumber) || yearNumber <= 0) {
+                return UNKNOWN_YEAR_LABEL;
+            }
+            return String(yearNumber);
+        }
+
+        function getNumericYear(yearValue) {
+            const yearNumber = Number(yearValue);
+            return Number.isFinite(yearNumber) && yearNumber > 0 ? yearNumber : null;
+        }
+
+        function detectSearchIntent(searchTerm, queryWords) {
+            const queryText = removeDiacritics(searchTerm || queryWords.join(" "));
+            const hasFormalIntent = /\b(chinh sach|quy che|quy trinh|huong dan|quy dinh|policy|procedure|manual|guide)\b/.test(queryText);
+            const hasChatIntent = /\b(tang luong|thuong|chuc mung|sinh nhat|hom qua|hom nay|tin nhan|7tr|trieu)\b/.test(queryText) || /\b\d+\s*(tr|trieu|k|vnd|vnđ)\b/.test(queryText);
+            const hasCodeIntent = /[a-z]{2,}[._\/-][a-z0-9._\/-]+/.test(queryText) || queryWords.some(word => /[._\/-]/.test(word));
+            return { hasFormalIntent, hasChatIntent, hasCodeIntent };
+        }
+
+        function getCandidateDocIndexes(uniqueSearchWords) {
+            if (!uniqueSearchWords || uniqueSearchWords.length === 0) return null;
+
+            const docMatchCounts = new Map();
+            let usedIndex = false;
+
+            uniqueSearchWords.forEach(word => {
+                const directMatches = searchTokenDocs.get(word);
+                if (directMatches && directMatches.length > 0) {
+                    usedIndex = true;
+                    directMatches.forEach(index => {
+                        docMatchCounts.set(index, (docMatchCounts.get(index) || 0) + 1);
+                    });
+                    return;
+                }
+
+                if (word.length < 3) return;
+
+                let expandedTokenCount = 0;
+                for (const token of searchDocFreq.keys()) {
+                    if (!token.includes(word)) continue;
+                    const tokenMatches = searchTokenDocs.get(token);
+                    if (!tokenMatches) continue;
+                    usedIndex = true;
+                    tokenMatches.forEach(index => {
+                        docMatchCounts.set(index, (docMatchCounts.get(index) || 0) + 1);
+                    });
+                    expandedTokenCount++;
+                    if (expandedTokenCount >= 160) break;
+                }
+            });
+
+            if (usedIndex) {
+                const minMatches = uniqueSearchWords.length <= 2
+                    ? 1
+                    : Math.max(2, Math.ceil(uniqueSearchWords.length * 0.4));
+                const candidateIndexes = new Set();
+                docMatchCounts.forEach((count, index) => {
+                    if (count >= minMatches) {
+                        candidateIndexes.add(index);
+                    }
+                });
+                return candidateIndexes;
+            }
+
+            if (uniqueSearchWords.every(word => word.length <= 2)) return new Set();
+            return null;
+        }
+
+        // Helper function to search database with specific terms
+        function searchDatabase(searchTerm, searchWords) {
+            if (!searchIndexReady) buildSearchIndex();
+
+            let matched = [];
+            const normalizedWords = filterSearchWords(searchWords);
+            const uniqueSearchWords = uniqueTokens(normalizedWords);
+            const normalizedSearchTerm = uniqueSearchWords.join(" ");
+            const minRequiredMatches = uniqueSearchWords.length <= 2 ? 1 : Math.ceil(uniqueSearchWords.length * 0.5);
+            const queryIntent = detectSearchIntent(searchTerm, uniqueSearchWords);
+            const candidateIndexes = getCandidateDocIndexes(uniqueSearchWords);
+            const candidateDocs = candidateIndexes
+                ? Array.from(candidateIndexes).map(index => SEARCH_DB[index]).filter(Boolean)
+                : SEARCH_DB;
+
+            candidateDocs.forEach(doc => {
+                const cache = prepareDocumentCache(doc);
+                const cleanTitle = cache.titleText;
+                const cleanContent = cache.contentText;
+
+                let score = 0;
+                let isMatch = false;
+                let matchedWordCount = 0;
+                let strongTitleMatch = false;
+
+                if (uniqueSearchWords.length === 0) {
+                    score = 1;
+                    isMatch = true;
+                } else {
+                    const titlePhraseMatched = normalizedSearchTerm && (
+                        uniqueSearchWords.length > 1
+                            ? cleanTitle.includes(normalizedSearchTerm)
+                            : includesWholeWord(cleanTitle, normalizedSearchTerm)
+                    );
+                    const contentPhraseMatched = normalizedSearchTerm && (
+                        uniqueSearchWords.length > 1
+                            ? cleanContent.includes(normalizedSearchTerm)
+                            : includesWholeWord(cleanContent, normalizedSearchTerm)
+                    );
+
+                    if (titlePhraseMatched) {
+                        score += 520;
+                        isMatch = true;
+                        strongTitleMatch = true;
+                    }
+
+                    if (contentPhraseMatched) {
+                        score += 260;
+                    }
+
+                    uniqueSearchWords.forEach((word) => {
+                        let wordMatched = false;
+                        const idf = getInverseDocumentFrequency(word);
+
+                        if (cache.titleTokenSet.has(word)) {
+                            score += 90 * idf;
+                            const titleIndex = findWholeWord(cleanTitle, word);
+                            score += Math.max(0, 18 - (titleIndex / 4));
+                            strongTitleMatch = true;
+                            wordMatched = true;
+                        } else if (word.length >= 3 && includesWholeWord(cleanTitle, word)) {
+                            score += 24 * idf;
+                            strongTitleMatch = true;
+                            wordMatched = true;
+                        }
+
+                        const exactContentTf = cache.termFreq[word] || 0;
+                        if (exactContentTf > 0) {
+                            const docLen = cache.tokenLength || doc.wordCount || 1;
+                            const k1 = 1.2;
+                            const b = 0.75;
+                            const normTF = (exactContentTf * (k1 + 1)) / (exactContentTf + k1 * (1 - b + b * (docLen / averageDocLength)));
+                            score += 38 * idf * normTF;
+                            wordMatched = true;
+                        } else if (word.length >= 5 && includesWholeWord(cleanContent, word)) {
+                            score += 3 * idf;
+                            wordMatched = true;
+                        }
+
+                        if (cache.metadataTokenSet.has(word) || cache.metadataText.includes(word)) {
+                            score += 20 * idf;
+                            wordMatched = true;
+                        }
+
+                        if (wordMatched) {
+                            matchedWordCount++;
+                        }
+                    });
+
+                    const coverage = matchedWordCount / uniqueSearchWords.length;
+                    if (matchedWordCount === uniqueSearchWords.length) {
+                        score += 120;
+                        isMatch = true;
+
+                        if (contentPhraseMatched) {
+                            score += 180;
+                        } else if (hasInOrderSentenceMatch(cleanContent, uniqueSearchWords)) {
+                            score += 110;
+                        }
+                    } else if (matchedWordCount >= minRequiredMatches || strongTitleMatch) {
+                        score += coverage * 35;
+                        isMatch = true;
+                    }
+                }
+
+                if (isMatch) {
+                    const sourceType = doc.source_type || "formal_document";
+                    const qualityScore = Number(doc.ocr_quality_score);
+                    const safeQualityScore = Number.isFinite(qualityScore) ? qualityScore : 1;
+                    const exactCodeHit = queryIntent.hasCodeIntent && uniqueSearchWords.some(word => word.length >= 4 && cleanTitle.includes(word));
+
+                    if (exactCodeHit) {
+                        score += 420;
+                    }
+
+                    if (queryIntent.hasFormalIntent && sourceType === "formal_document") {
+                        score += 160;
+                    }
+
+                    if (queryIntent.hasChatIntent && sourceType === "chat_screenshot") {
+                        score += 180;
+                    }
+
+                    if (sourceType === "low_confidence_ocr") {
+                        score *= 0.65;
+                    } else if (safeQualityScore < 0.7) {
+                        score *= Math.max(0.35, safeQualityScore);
+                    }
+
+                    // 3. Document Authority/Credibility Factors
+
+                    // A. Doc Type Authority
+                    if (doc.doc_type === "Quy chế / Chính sách" || doc.doc_type === "Quy trình / Hướng dẫn") {
+                        score += 15;
+                    }
+
+                    // B. Approved / Signed credibility
+                    const docTitleLower = (doc.title || "").toLowerCase();
+                    if (docTitleLower.includes("signed") || docTitleLower.includes("da ky") || docTitleLower.includes("phe duyet") || docTitleLower.includes("bom")) {
+                        score += 12;
+                    }
+
+                    const detectedYear = getNumericYear(doc.year);
+                    if (detectedYear && detectedYear >= 2010) {
+                        score += Math.min(24, (detectedYear - 2010) * 1.2);
+                    }
+
+                    matched.push({
+                        doc: doc,
+                        score: score,
+                        matchedCount: matchedWordCount
+                    });
+                }
+            });
+
+            // Sort matched results by final relevance first.
+            matched.sort((a, b) => {
+                if (b.score !== a.score) {
+                    return b.score - a.score;
+                }
+                return b.matchedCount - a.matchedCount;
+            });
+
+            // Two-Pass Ranking: only apply proximity to strong candidates.
+            if (uniqueSearchWords.length >= 2) {
+                const topN = matched.slice(0, 80);
+                topN.forEach(item => {
+                    const cache = prepareDocumentCache(item.doc);
+                    item.score += getMinSpanProximityBonus(cache, uniqueSearchWords);
+                });
+                
+                matched.sort((a, b) => {
+                    if (b.score !== a.score) {
+                        return b.score - a.score;
+                    }
+                    return b.matchedCount - a.matchedCount;
+                });
+            }
+
+            return matched;
+        }
+
+        function getInverseDocumentFrequency(word) {
+            if (!word || totalSearchDocs === 0) return 1;
+            const df = searchDocFreq.get(word) || 0;
+            return Math.max(0.25, Math.log(1 + (totalSearchDocs - df + 0.5) / (df + 0.5)));
+        }
+
+        // Core Search Engine & Ranking Logic
+        function performSearchFilterAndRender() {
+            if (typeof SEARCH_DB === "undefined") return;
+
+            const startTime = performance.now();
+
+            const rawQuery = activeQuery;
+            const cleanQuery = removeDiacritics(rawQuery);
+            const queryWords = tokenize(cleanQuery);
+            const filteredWords = filterSearchWords(queryWords);
+
+            let matched = [];
+            let spellingSuggestion = null;
+            let showAutocorrectMessage = false;
+
+            // Score by the main query; filter query is applied strictly after ranking.
+            let searchWords = [...filteredWords];
+            let searchTerm = filteredWords.join(" ");
+
+            // 1. Luôn ưu tiên tìm kiếm bằng từ khóa gốc trước
+            matched = searchDatabase(searchTerm, searchWords);
+
+            // 2. Spellcheck logic
+            if (autocorrectEnabled && queryWords.length > 0) {
+                spellingSuggestion = getSpellingCorrection(rawQuery);
+                if (spellingSuggestion && removeDiacritics(spellingSuggestion) !== cleanQuery) {
+                    // Chỉ tự động thay thế nếu tìm kiếm từ khóa gốc không ra kết quả
+                    if (matched.length === 0) {
+                        const suggestedClean = removeDiacritics(spellingSuggestion);
+                        const suggestedWords = tokenize(suggestedClean);
+                        const filteredSuggestedWords = filterSearchWords(suggestedWords);
+                        
+                        let suggestedSearchWords = [...filteredSuggestedWords];
+                        let suggestedSearchTerm = filteredSuggestedWords.join(" ");
+                        
+                        const suggestedMatched = searchDatabase(suggestedSearchTerm, suggestedSearchWords);
+
+                        if (suggestedMatched.length > 0) {
+                            matched = suggestedMatched;
+                            searchTerm = suggestedSearchTerm;
+                            searchWords = suggestedSearchWords;
+                            showAutocorrectMessage = true;
+                        }
+                    }
+                }
+            }
+
+            let results = matched.map(m => m.doc);
+            currentMatchedDocs = results;
+
+            // Apply active filters (sidebar filters)
+            if (selectedDomain) {
+                results = results.filter(r => r.domain === selectedDomain);
+            }
+            if (selectedDocExt) {
+                results = results.filter(r => {
+                    const ext = r.original_path.split('.').pop().toUpperCase();
+                    return ext === selectedDocExt;
+                });
+            }
+            if (selectedDocYear) {
+                results = results.filter(r => {
+                    return getNormalizedYear(r.year) === String(selectedDocYear);
+                });
+            }
+
+            // Apply strict filtering of results: must match filter query
+            if (filterQuery) {
+                const cleanFilterQuery = removeDiacritics(filterQuery);
+                const filterWords = tokenize(cleanFilterQuery);
+                const filteredFilterWords = filterSearchWords(filterWords);
+                results = results.filter(doc => {
+                    const cache = prepareDocumentCache(doc);
+                    const cleanTitle = cache.titleText;
+                    const cleanContent = cache.contentText;
+                    return filteredFilterWords.every(word => cleanTitle.includes(word) || cleanContent.includes(word));
+                });
+            }
+
+            filteredResults = results;
+            currentPage = 1;
+
+            const endTime = performance.now();
+            const timeDiff = ((endTime - startTime) / 1000).toFixed(3);
+
+            // Update stats count text
+            document.getElementById("resultsCountText").textContent = `Tìm thấy khoảng ${filteredResults.length} kết quả (${timeDiff} giây)`;
+
+            // Render Google-style autocorrect suggestions banner
+            const spellingBanner = document.getElementById("spellingBanner");
+            const escapedSpellingSuggestion = escapeHTML(spellingSuggestion);
+            const escapedRawQuery = escapeHTML(rawQuery);
+            if (showAutocorrectMessage && spellingSuggestion) {
+                spellingBanner.innerHTML = `Hiển thị kết quả cho <b>${escapedSpellingSuggestion}</b>. Tìm kiếm thay thế cho <a onclick="searchOriginal(event, '${escapeJsString(rawQuery)}')">${escapedRawQuery}</a>`;
+                spellingBanner.style.display = "block";
+            } else if (!showAutocorrectMessage && results.length === 0 && spellingSuggestion && removeDiacritics(spellingSuggestion) !== cleanQuery) {
+                // If 0 results, and suggestion is available, show "Did you mean?" banner
+                spellingBanner.innerHTML = `Không tìm thấy kết quả cho <b>${escapedRawQuery}</b>. Có phải ý bạn là: <a onclick="searchSuggestionDirect(event, '${escapeJsString(spellingSuggestion)}')"><em>${escapedSpellingSuggestion}</em></a>?`;
+                spellingBanner.style.display = "block";
+            } else {
+                spellingBanner.style.display = "none";
+            }
+
+            let highlightWords = [...searchWords];
+            if (filterQuery) {
+                const cleanFilterQuery = removeDiacritics(filterQuery);
+                const filterWords = tokenize(cleanFilterQuery);
+                highlightWords = [...highlightWords, ...filterWords];
+            }
+
+            renderExtractiveAnswer(highlightWords);
+            renderResultsList(highlightWords);
+            renderSidebarFilters();
+            alignSidebar();
+        }
+
+        // Search original query and disable autocorrect for this session
+        function searchOriginal(event, originalQuery) {
+            if (event) event.preventDefault();
+            autocorrectEnabled = false;
+            document.getElementById("searchInput").value = originalQuery;
+            executeSearch(true);
+        }
+
+        // Click suggestion link directly to search
+        function searchSuggestionDirect(event, suggestedQuery) {
+            if (event) event.preventDefault();
+            autocorrectEnabled = true;
+            document.getElementById("searchInput").value = suggestedQuery;
+            executeSearch();
+        }
+
+        // Get File Icon SVG based on file extension
+        function getFileIconSVG(filePath) {
+            const ext = filePath.split('.').pop().toLowerCase();
+            if (ext === 'pdf') {
+                return `<svg class="file-icon file-icon-pdf" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-9.5 8.5c0 .83-.67 1.5-1.5 1.5H7v1.5H5.5V9H8c.83 0 1.5.67 1.5 1.5v1zm5 2c0 .83-.67 1.5-1.5 1.5h-2.5V9H13c.83 0 1.5.67 1.5 1.5v3zm4-3.5h-3v1.5h2.5V13H15v1.5H13.5V9H19v2.5zM9 11.5H8v-1h1v1zm3.5 2H13v-3h-.5v3z"/>
+                </svg>`;
+            } else if (ext === 'doc' || ext === 'docx') {
+                return `<svg class="file-icon file-icon-word" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/>
+                </svg>`;
+            } else if (ext === 'xls' || ext === 'xlsx') {
+                return `<svg class="file-icon file-icon-excel" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-6 11h-2v2H9.5v-2h-2v-1.5h2v-2H9.5v2h-2v-1.5h2v-2H11v2h2v-2h1.5v2h-2v2h2v1.5z"/>
+                </svg>`;
+            } else {
+                return `<svg class="file-icon file-icon-default" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/>
+                </svg>`;
+            }
+        }
+
+        function escapeHTML(str) {
+            if (!str) return "";
+            return str
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
+
+        // Highlight helper for text inputs like title
+        function highlightText(text, searchWords) {
+            if (!text) return "";
+            if (!searchWords || searchWords.length === 0) return escapeHTML(text);
+
+            let highlighted = text;
+            const startTag = "\uE000";
+            const endTag = "\uE001";
+
+            searchWords.forEach(word => {
+                const escaped = escapeRegex(word);
+                const accentPattern = buildAccentInsensitivePattern(word);
+
+                try {
+                    const flexRegex = new RegExp('(^|[^' + VT_LETTERS_STR + '])(' + accentPattern + ')(?!' + VT_LETTERS_CLASS + ')', 'gi');
+                    highlighted = highlighted.replace(flexRegex, (match, p1, p2) => {
+                        return p1 + startTag + p2 + endTag;
+                    });
+                } catch (e) {
+                    const regex = new RegExp('(^|[^' + VT_LETTERS_STR + '])(' + escaped + ')(?!' + VT_LETTERS_CLASS + ')', 'gi');
+                    highlighted = highlighted.replace(regex, (match, p1, p2) => {
+                        return p1 + startTag + p2 + endTag;
+                    });
+                }
+            });
+
+            highlighted = escapeHTML(highlighted);
+            const startRegex = new RegExp(startTag, 'g');
+            const endRegex = new RegExp(endTag, 'g');
+            highlighted = highlighted.replace(startRegex, '<mark class="highlight-mark">').replace(endRegex, '</mark>');
+
+            return highlighted;
+        }
+
+        function splitAnswerPassages(content) {
+            const rawContent = String(content || "").replace(/\r\n/g, "\n");
+            const blocks = rawContent.split(/\n\s*\n+/).map(part => part.trim()).filter(Boolean);
+            const sourceBlocks = blocks.length > 0 ? blocks : rawContent.split(/\n+/).map(part => part.trim()).filter(Boolean);
+            const passages = [];
+            let cursor = 0;
+
+            sourceBlocks.forEach(block => {
+                const foundAt = rawContent.indexOf(block, cursor);
+                const startIndex = foundAt >= 0 ? foundAt : cursor;
+                cursor = startIndex + block.length;
+
+                if (block.length <= 850) {
+                    passages.push({ text: block, startIndex });
+                    return;
+                }
+
+                const sentences = block.split(/(?<=[.!?。！？])\s+/).filter(Boolean);
+                let chunk = "";
+                let chunkStart = startIndex;
+                sentences.forEach(sentence => {
+                    if ((chunk + " " + sentence).trim().length > 650 && chunk) {
+                        passages.push({ text: chunk.trim(), startIndex: chunkStart });
+                        chunkStart = startIndex + block.indexOf(sentence);
+                        chunk = sentence;
+                    } else {
+                        if (!chunk) chunkStart = startIndex + block.indexOf(sentence);
+                        chunk = `${chunk} ${sentence}`.trim();
+                    }
+                });
+                if (chunk) passages.push({ text: chunk.trim(), startIndex: chunkStart });
+            });
+
+            return passages.filter(p => p.text.length >= 40).slice(0, 120);
+        }
+
+        function scoreAnswerPassage(passage, doc, searchWords, normalizedPhrase) {
+            const cleanText = removeDiacritics(passage.text);
+            const uniqueWords = uniqueTokens(searchWords || []);
+            if (uniqueWords.length === 0) return null;
+
+            let matchedUnique = 0;
+            let totalHits = 0;
+            uniqueWords.forEach(word => {
+                if (!word) return;
+                let pos = cleanText.indexOf(word);
+                let wordHits = 0;
+                while (pos !== -1) {
+                    wordHits++;
+                    pos = cleanText.indexOf(word, pos + word.length);
+                }
+                if (wordHits > 0) matchedUnique++;
+                totalHits += wordHits;
+            });
+
+            if (matchedUnique === 0) return null;
+
+            const coverage = matchedUnique / uniqueWords.length;
+            const compactLength = Math.max(1, cleanText.length / 120);
+            let score = (coverage * 65) + (matchedUnique * 18) + (Math.min(totalHits, 12) * 4);
+
+            if (normalizedPhrase && cleanText.includes(normalizedPhrase)) score += 70;
+            if (coverage === 1) score += 45;
+            if ((doc.title_clean || removeDiacritics(doc.title || "")).includes(uniqueWords.join(" "))) score += 12;
+            if ((doc.source_type || "formal_document") === "formal_document") score += 8;
+
+            const qualityScore = Number(doc.ocr_quality_score);
+            if (Number.isFinite(qualityScore) && qualityScore < 0.75) {
+                score *= Math.max(0.45, qualityScore);
+            }
+
+            score += Math.max(0, 10 - compactLength);
+
+            return {
+                doc,
+                text: passage.text,
+                startIndex: passage.startIndex,
+                score,
+                coverage,
+                matchedUnique,
+                totalHits
+            };
+        }
+
+        function buildExtractiveAnswer(searchWords) {
+            const uniqueWords = uniqueTokens(searchWords || []);
+            if (uniqueWords.length === 0 || filteredResults.length === 0) return null;
+
+            const normalizedPhrase = uniqueWords.length > 1 ? uniqueWords.join(" ") : "";
+            const candidates = [];
+            const docsToScan = filteredResults.slice(0, 12);
+
+            docsToScan.forEach(doc => {
+                splitAnswerPassages(doc.content).forEach(passage => {
+                    const scored = scoreAnswerPassage(passage, doc, uniqueWords, normalizedPhrase);
+                    if (scored) candidates.push(scored);
+                });
+            });
+
+            candidates.sort((a, b) => b.score - a.score);
+            const best = candidates[0];
+            if (!best || best.score < 42 || best.coverage < 0.35) return null;
+
+            const selected = [];
+            const usedDocs = new Set();
+            for (const item of candidates) {
+                const docKey = `${item.doc.title}|${item.doc.path}`;
+                if (usedDocs.has(docKey) && selected.length > 0) continue;
+                selected.push(item);
+                usedDocs.add(docKey);
+                if (selected.length >= 3) break;
+            }
+
+            let confidence = "Thấp";
+            if (best.score >= 135 && best.coverage >= 0.8) confidence = "Cao";
+            else if (best.score >= 82 && best.coverage >= 0.5) confidence = "Trung bình";
+
+            return { confidence, main: best, sources: selected };
+        }
+
+        function getDocGlobalIndex(doc) {
+            return SEARCH_DB.findIndex(d => d.title === doc.title && d.path === doc.path);
+        }
+
+        function toggleAnswerSuggestions(button) {
+            const panel = document.getElementById("answerPanel");
+            if (!panel) return;
+            const isCollapsed = panel.classList.toggle("is-collapsed");
+            button.textContent = isCollapsed ? "Hiện gợi ý" : "Ẩn gợi ý";
+        }
+
+        function renderExtractiveAnswer(searchWords) {
+            const panel = document.getElementById("answerPanel");
+            if (!panel) return;
+            panel.classList.remove("is-collapsed");
+
+            const answer = buildExtractiveAnswer(searchWords);
+            panel.classList.add("show");
+
+            if (!answer) {
+                panel.innerHTML = `
+                    <div class="answer-header">
+                        <div class="answer-title">Đề xuất kết quả tốt nhất</div>
+                        <div class="answer-confidence">Chưa đủ dữ liệu</div>
+                    </div>
+                    <div class="answer-note">SS không tìm thấy đoạn trích đủ mạnh trong dữ liệu local. Hãy thử câu hỏi cụ thể hơn hoặc xem danh sách kết quả bên dưới.</div>
+                `;
+                return;
+            }
+
+            const sourceHTML = answer.sources.map((item, idx) => {
+                const doc = item.doc;
+                const globalIndex = getDocGlobalIndex(doc);
+                const originalPath = doc.original_path || doc.path.replace(/\.md$/i, '');
+                const absoluteWindowsPath = doc.absolute_original_path || `d:\\CICT BACKUP\\CICT PROCEDURES\\${originalPath.replace(/\//g, '\\')}`;
+                const fileIconHTML = getFileIconSVG(originalPath);
+
+                return `
+                    <div class="answer-source">
+                        <div class="answer-source-main">
+                            ${fileIconHTML}
+                            <a href="javascript:void(0)" class="answer-source-title" onclick="event.stopPropagation(); openQuickView(${globalIndex})" title="Click để xem nhanh nội dung tài liệu">${idx + 1}. ${escapeHTML(doc.title)}</a>
+                        </div>
+                        <div class="answer-source-actions">
+                            <button class="answer-icon-btn" onclick="event.stopPropagation(); openQuickView(${globalIndex})" title="Xem nhanh tài liệu">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"></path>
+                                    <circle cx="12" cy="12" r="3"></circle>
+                                </svg>
+                            </button>
+                            <button class="answer-icon-btn" onclick="event.stopPropagation(); copyPathToClipboard('${escapeJsString(absoluteWindowsPath)}')" title="Mở vị trí file gốc">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M15 3h6v6"></path>
+                                    <path d="M10 14 21 3"></path>
+                                    <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }).join("");
+
+            panel.innerHTML = `
+                <div class="answer-header">
+                    <div class="answer-title">Đề xuất kết quả tốt nhất</div>
+                    <button class="answer-toggle-btn" type="button" onclick="toggleAnswerSuggestions(this)">Ẩn gợi ý</button>
+                </div>
+                <div class="answer-content">
+                    <div class="answer-main">${highlightText(answer.main.text, searchWords)}</div>
+                    <div class="answer-sources">${sourceHTML}</div>
+                </div>
+            `;
+        }
+
+        // Render Results List cards
+        function renderResultsList(searchWords) {
+            const listContainer = document.getElementById("resultsList");
+            listContainer.innerHTML = "";
+
+            const loadMoreBtn = document.getElementById("loadMoreContainer");
+
+            if (filteredResults.length === 0) {
+                listContainer.innerHTML = `
+                    <div style="padding: 40px 0; text-align: center; color: var(--text-secondary);">
+                        <p style="font-size: 16px; margin-bottom: 8px;">Không tìm thấy tài liệu phù hợp.</p>
+                        <p style="font-size: 13px;">Hãy thử tìm kiếm bằng từ khóa khác hoặc loại bỏ các bộ lọc.</p>
+                    </div>
+                `;
+                loadMoreBtn.style.display = "none";
+                return;
+            }
+
+            const totalPages = Math.ceil(filteredResults.length / RESULTS_PER_PAGE);
+            currentPage = Math.min(Math.max(currentPage, 1), totalPages);
+            const startIndex = (currentPage - 1) * RESULTS_PER_PAGE;
+            const endIndex = startIndex + RESULTS_PER_PAGE;
+            const pageResults = filteredResults.slice(startIndex, endIndex);
+
+            pageResults.forEach((doc) => {
+                // Find global index in SEARCH_DB
+                const globalIndex = SEARCH_DB.findIndex(d => d.title === doc.title && d.path === doc.path);
+
+                const item = document.createElement("div");
+                item.className = "result-item";
+                item.setAttribute("onclick", `openQuickView(${globalIndex})`);
+                item.style.cursor = "pointer";
+
+                // Dynamic text snippet generation
+                const snippetHTML = getSmartSnippet(doc.content, searchWords);
+
+                // Extract original path and create link
+                const originalPath = doc.original_path || doc.path.replace(/\.md$/i, '');
+                const absoluteWindowsPath = doc.absolute_original_path || `d:\\CICT BACKUP\\CICT PROCEDURES\\${originalPath.replace(/\//g, '\\')}`;
+
+                // Get SVG icon based on original file extension
+                const fileIconHTML = getFileIconSVG(originalPath);
+
+                item.innerHTML = `
+                    <div class="result-header-row">
+                        <div class="result-title-container">
+                            ${fileIconHTML}
+                            <a href="javascript:void(0)" class="result-title" onclick="event.stopPropagation(); openQuickView(${globalIndex})" title="Click để xem nhanh nội dung tài liệu">${highlightText(doc.title, searchWords)}</a>
+                        </div>
+                        <div class="action-buttons">
+                            <button class="copy-path-btn" onclick="event.stopPropagation(); copyPathToClipboard('${escapeJsString(absoluteWindowsPath)}')" title="Bấm để chuyển đến file tài liệu gốc">
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-external-link">
+                                    <path d="M15 3h6v6"></path>
+                                    <path d="M10 14 21 3"></path>
+                                    <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+                                </svg>
+                                Đến file gốc
+                            </button>
+                        </div>
+                    </div>
+                    <div class="result-snippet">
+                        ${snippetHTML}
+                    </div>
+                `;
+
+                listContainer.appendChild(item);
+            });
+
+            const endNote = document.createElement("div");
+            endNote.className = "end-results-note";
+            endNote.textContent = "Không còn kết quả nào phù hợp";
+            listContainer.appendChild(endNote);
+
+            renderPaginationControls(totalPages, searchWords);
+        }
+
+        function renderPaginationControls(totalPages, searchWords) {
+            const paginationContainer = document.getElementById("loadMoreContainer");
+            if (!paginationContainer) return;
+            paginationContainer.innerHTML = "";
+
+            if (totalPages <= 1) {
+                paginationContainer.style.display = "none";
+                return;
+            }
+
+            paginationContainer.style.display = "flex";
+
+            for (let page = 1; page <= totalPages; page++) {
+                const pageBtn = document.createElement("button");
+                pageBtn.type = "button";
+                pageBtn.className = `pagination-btn${page === currentPage ? " active" : ""}`;
+                pageBtn.textContent = page;
+                pageBtn.onclick = () => goToResultsPage(page, searchWords);
+                paginationContainer.appendChild(pageBtn);
+            }
+
+            if (currentPage < totalPages) {
+                const nextBtn = document.createElement("button");
+                nextBtn.type = "button";
+                nextBtn.className = "pagination-btn pagination-next-btn";
+                nextBtn.textContent = "Next";
+                nextBtn.onclick = () => goToResultsPage(currentPage + 1, searchWords);
+                paginationContainer.appendChild(nextBtn);
+            }
+        }
+
+        function goToResultsPage(page, searchWords) {
+            currentPage = page;
+            renderResultsList(searchWords);
+        }
+
+        function loadMoreResults() {
+            const cleanQuery = removeDiacritics(activeQuery);
+            let queryWords = tokenize(cleanQuery);
+            let searchWords = filterSearchWords(queryWords);
+            if (filterQuery) {
+                const cleanFilterQuery = removeDiacritics(filterQuery);
+                const filterWords = tokenize(cleanFilterQuery);
+                searchWords = [...searchWords, ...filterSearchWords(filterWords)];
+            }
+            goToResultsPage(currentPage + 1, searchWords);
+        }
+
+        // Smart Highlight and window slicing
+        function getSmartSnippet(content, searchWords) {
+            if (!content) return "Không có nội dung.";
+            if (!searchWords || searchWords.length === 0) {
+                return escapeHTML(content.substring(0, 100)) + "...";
+            }
+
+            const cleanContent = removeDiacritics(content);
+            const cleanQuery = searchWords.join(" ");
+
+            let bestIndex = -1;
+
+            // 1. Prioritize exact phrase match
+            if (cleanQuery && cleanQuery.trim().length > 0) {
+                const phraseIdx = cleanContent.indexOf(cleanQuery);
+                if (phraseIdx !== -1) {
+                    bestIndex = phraseIdx;
+                }
+            }
+
+            // 2. If no exact phrase match, find the window with the most unique keyword matches
+            if (bestIndex === -1) {
+                const matches = [];
+                searchWords.forEach(word => {
+                    let pos = cleanContent.indexOf(word);
+                    while (pos !== -1) {
+                        matches.push({ index: pos, word: word });
+                        pos = cleanContent.indexOf(word, pos + 1);
+                    }
+                });
+
+                if (matches.length > 0) {
+                    matches.sort((a, b) => a.index - b.index);
+
+                    let maxUniqueCount = 0;
+                    let maxTotalCount = 0;
+                    let bestMatchIdx = matches[0].index;
+
+                    matches.forEach(m => {
+                        const startRange = Math.max(0, m.index - 30);
+                        const endRange = m.index + 80;
+                        const subText = cleanContent.substring(startRange, endRange);
+
+                        let uniqueCount = 0;
+                        let totalCount = 0;
+                        searchWords.forEach(word => {
+                            if (subText.includes(word)) {
+                                uniqueCount++;
+                                let pos = subText.indexOf(word);
+                                while (pos !== -1) {
+                                    totalCount++;
+                                    pos = subText.indexOf(word, pos + 1);
+                                }
+                            }
+                        });
+
+                        if (uniqueCount > maxUniqueCount || (uniqueCount === maxUniqueCount && totalCount > maxTotalCount)) {
+                            maxUniqueCount = uniqueCount;
+                            maxTotalCount = totalCount;
+                            bestMatchIdx = m.index;
+                        }
+                    });
+
+                    bestIndex = bestMatchIdx;
+                }
+            }
+
+            if (bestIndex === -1) {
+                return escapeHTML(content.substring(0, 100)) + "...";
+            }
+
+            // Slice context around matches
+            let start = Math.max(0, bestIndex - 30);
+            let end = Math.min(content.length, bestIndex + 80);
+
+            let snippet = content.substring(start, end);
+
+            if (start > 0) snippet = "..." + snippet;
+            if (end < content.length) snippet = snippet + "...";
+
+            const startTag = "\uE000";
+            const endTag = "\uE001";
+
+            // Highlight words matching query (supporting diacritics using flexible matching)
+            searchWords.forEach(word => {
+                const escaped = escapeRegex(word);
+                const accentPattern = buildAccentInsensitivePattern(word);
+
+                try {
+                    const flexRegex = new RegExp('(^|[^' + VT_LETTERS_STR + '])(' + accentPattern + ')(?!' + VT_LETTERS_CLASS + ')', 'gi');
+                    snippet = snippet.replace(flexRegex, '$1' + startTag + '$2' + endTag);
+                } catch (e) {
+                    const regex = new RegExp('(^|[^' + VT_LETTERS_STR + '])(' + escaped + ')(?!' + VT_LETTERS_CLASS + ')', 'gi');
+                    snippet = snippet.replace(regex, '$1' + startTag + '$2' + endTag);
+                }
+            });
+
+            snippet = escapeHTML(snippet);
+            const startRegex = new RegExp(startTag, 'g');
+            const endRegex = new RegExp(endTag, 'g');
+            snippet = snippet.replace(startRegex, '<mark class="highlight-mark">').replace(endRegex, '</mark>');
+
+            return snippet;
+        }
+
+        // Render Sidebar filters with counts
+        function renderSidebarFilters() {
+            if (typeof SEARCH_DB === "undefined") return;
+
+            const docExts = {};
+            const docYears = {};
+
+            const sourceDocs = currentMatchedDocs.length > 0 ? currentMatchedDocs : SEARCH_DB;
+            sourceDocs.forEach(doc => {
+                let isMatch = false;
+                if (selectedDomain && doc.domain !== selectedDomain) return;
+                isMatch = true;
+
+                if (isMatch) {
+                    const ext = doc.original_path.split('.').pop().toUpperCase();
+                    const dy = getNormalizedYear(doc.year);
+
+                    // 1. Đếm cho Loại tài liệu (phụ thuộc vào Năm khởi tạo đang chọn)
+                    let matchForExt = true;
+                    if (selectedDocYear) {
+                        matchForExt = (String(dy) === String(selectedDocYear));
+                    }
+                    if (matchForExt) {
+                        docExts[ext] = (docExts[ext] || 0) + 1;
+                    }
+
+                    // 2. Đếm cho Năm khởi tạo (phụ thuộc vào Loại tài liệu đang chọn)
+                    let matchForYear = true;
+                    if (selectedDocExt) {
+                        matchForYear = (ext === selectedDocExt);
+                    }
+                    if (matchForYear) {
+                        docYears[dy] = (docYears[dy] || 0) + 1;
+                    }
+                }
+            });
+
+            renderFilterSection("filterDocExt", docExts, selectedDocExt, setDocExtFilter);
+            renderFilterSection("filterDocYear", docYears, selectedDocYear, setDocYearFilter);
+        }
+
+        function renderFilterSection(containerId, dataCounts, selectedValue, setFilterCallback) {
+            const container = document.getElementById(containerId);
+            if (!container) return;
+            container.innerHTML = "";
+
+            const select = document.createElement("select");
+            select.className = "filter-select";
+            select.onchange = (e) => setFilterCallback(e.target.value);
+
+            // Add default "Tất cả" option
+            const defaultOpt = document.createElement("option");
+            defaultOpt.value = "";
+            defaultOpt.textContent = "Tất cả";
+            defaultOpt.selected = (selectedValue === "");
+            select.appendChild(defaultOpt);
+
+            const keys = Object.keys(dataCounts).sort((a, b) => {
+                if (containerId === "filterDocYear") {
+                    if (a === UNKNOWN_YEAR_LABEL) return 1;
+                    if (b === UNKNOWN_YEAR_LABEL) return -1;
+                    return parseInt(b, 10) - parseInt(a, 10);
+                }
+                return dataCounts[b] - dataCounts[a];
+            });
+
+            keys.forEach(key => {
+                const count = dataCounts[key];
+                if (count === 0) return;
+
+                const opt = document.createElement("option");
+                opt.value = key;
+                opt.textContent = `${key} (${count})`;
+                opt.selected = (selectedValue !== "" && String(selectedValue) === String(key));
+                select.appendChild(opt);
+            });
+
+            container.appendChild(select);
+        }
+
+        // Set Filter Functions
+        function setDocExtFilter(val) {
+            selectedDocExt = val;
+            performSearchFilterAndRender();
+        }
+
+        function setDocYearFilter(val) {
+            selectedDocYear = val;
+            performSearchFilterAndRender();
+        }
+
+        // Clipboard Action helper
+        function copyPathToClipboard(pathStr) {
+            navigator.clipboard.writeText(pathStr).then(function () {
+                showToast("Đã sao chép đường dẫn tuyệt đối!");
+                if (window.pywebview && window.pywebview.api && window.pywebview.api.open_explorer) {
+                    window.pywebview.api.open_explorer(pathStr);
+                }
+            }, function (err) {
+                alert("Không thể sao chép: " + err);
+            });
+        }
+
+        function showToast(message) {
+            const toast = document.getElementById("toast");
+            document.getElementById("toastText").textContent = message;
+            toast.classList.add("show");
+            setTimeout(() => {
+                toast.classList.remove("show");
+            }, 3000);
+        }
+
+        // Liquid Glass Tooltip
+        function showScanTooltip(message) {
+            const tooltip = document.getElementById("scanTooltip");
+            const text = document.getElementById("scanTooltipText");
+            if (!tooltip || !text) return;
+            text.textContent = message;
+            tooltip.classList.add("show");
+
+            if (window.scanTooltipTimeout) {
+                clearTimeout(window.scanTooltipTimeout);
+            }
+
+            window.scanTooltipTimeout = setTimeout(() => {
+                tooltip.classList.remove("show");
+            }, 3000);
+        }
+
+        // Ghi đè window.alert mặc định bằng Alert phong cách Liquid Glass
+        window.alert = function(message) {
+            showLgAlert(message, "Thông báo");
+        };
+
+        function showLgAlert(message, title = "Thông báo") {
+            const overlay = document.getElementById("lgAlertOverlay");
+            const titleEl = document.getElementById("lgAlertTitle");
+            const bodyEl = document.getElementById("lgAlertBody");
+            if (!overlay || !titleEl || !bodyEl) return;
+
+            titleEl.textContent = title;
+            bodyEl.textContent = message;
+            overlay.style.display = "flex";
+
+            // Đóng bằng Enter hoặc Escape
+            const handleAlertKey = function(event) {
+                if (event.key === "Enter" || event.key === "Escape") {
+                    event.preventDefault();
+                    closeLgAlert();
+                    document.removeEventListener("keydown", handleAlertKey);
+                }
+            };
+            document.removeEventListener("keydown", handleAlertKey);
+            document.addEventListener("keydown", handleAlertKey);
+        }
+
+        function closeLgAlert(event) {
+            if (event && event.target !== document.getElementById("lgAlertOverlay")) {
+                return;
+            }
+            document.getElementById("lgAlertOverlay").style.display = "none";
+        }
+
+        function resetToHome() {
+            selectedDocExt = "";
+            selectedDocYear = "";
+            selectedDomain = "";
+            activeQuery = "";
+            filterQuery = "";
+            autocorrectEnabled = true;
+            currentMatchedDocs = [];
+
+            const filterInput = document.getElementById("filterResultsInput");
+            if (filterInput) filterInput.value = "";
+
+            document.getElementById("searchInput").value = "";
+            document.getElementById("clearBtn").style.display = "none";
+            document.body.classList.remove("show-results");
+
+            const main = document.getElementById("mainContainer");
+            main.className = "landing-state";
+
+            // Di chuyển search bar trở lại vị trí ban đầu
+            const searchSection = document.querySelector('.search-section');
+            const landingButtons = document.getElementById('landingButtons');
+            if (searchSection && main && landingButtons) {
+                main.insertBefore(searchSection, landingButtons);
+            }
+
+            // Reset sidebar margin
+            const sidebar = document.querySelector(".filters-sidebar");
+            if (sidebar) {
+                sidebar.style.marginTop = "0px";
+            }
+
+            buildDashboardStats();
+            document.getElementById("searchInput").focus();
+        }
+
+        function handleFilterResultsKeyDown(event) {
+            if (event.key === "Enter") {
+                event.preventDefault();
+                filterQuery = document.getElementById("filterResultsInput").value.trim();
+                performSearchFilterAndRender();
+            }
+        }
+
+        function alignSidebar() {
+            const sidebar = document.querySelector(".filters-sidebar");
+            if (sidebar) {
+                sidebar.style.marginTop = "0px";
+            }
+        }
+
+        function escapeJsString(str) {
+            return str.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+        }
+
+        // Quick View Modal Handlers
+        function openQuickView(index) {
+            const doc = SEARCH_DB[index];
+            if (!doc) return;
+
+            const modalTitle = document.getElementById("modalTitle");
+            const modalBody = document.getElementById("modalBody");
+            const overlay = document.getElementById("quickViewOverlay");
+
+            // Setup title with appropriate icon
+            const originalPath = doc.path.replace(/\.md$/i, '');
+            const fileIconHTML = getFileIconSVG(originalPath);
+            modalTitle.innerHTML = `${fileIconHTML} <span style="margin-left: 4px;">${escapeHTML(doc.title)}</span>`;
+
+            // Prepare content and highlight words
+            const cleanQuery = removeDiacritics(activeQuery);
+            const searchWords = filterSearchWords(tokenize(cleanQuery));
+
+            let displayContent = doc.content || "Không có nội dung chi tiết.";
+
+            // Format content basic line breaks to paragraphs/br
+            const paragraphs = displayContent.split(/\n\s*\n/);
+            let formattedHTML = paragraphs.map(p => {
+                let pEscaped = escapeHTML(p);
+                let pClean = pEscaped.replace(/\n/g, '<br>');
+                return `<p>${pClean}</p>`;
+            }).join('');
+
+            // Parse into temporary element to safely highlight text nodes
+            const tempDiv = document.createElement("div");
+            tempDiv.innerHTML = formattedHTML;
+
+            if (searchWords.length > 0) {
+                highlightElementTextNodes(tempDiv, searchWords);
+            }
+
+            modalBody.innerHTML = tempDiv.innerHTML;
+            overlay.style.display = "flex";
+            document.body.style.overflow = "hidden"; // Prevent scrolling body
+
+            // Tạo các vạch định vị highlight trên scrollbar
+            const markerTrack = document.getElementById("scrollbarMarkerTrack");
+            if (markerTrack) {
+                markerTrack.innerHTML = "";
+                setTimeout(() => {
+                    const marks = modalBody.querySelectorAll("mark.highlight-mark");
+                    const scrollHeight = modalBody.scrollHeight;
+                    const containerHeight = modalBody.clientHeight;
+
+                    if (scrollHeight > 0 && marks.length > 0) {
+                        // Giới hạn tối đa 150 markers để tránh quá tải DOM
+                        const step = Math.ceil(marks.length / 150);
+                        marks.forEach((mark, markIdx) => {
+                            if (markIdx % step !== 0) return;
+                            const ratio = mark.offsetTop / scrollHeight;
+                            const marker = document.createElement("div");
+                            marker.className = "scrollbar-marker";
+                            marker.style.top = (ratio * containerHeight) + "px";
+                            marker.title = `Đến vị trí highlight ${markIdx + 1}`;
+                            marker.onclick = (e) => {
+                                e.stopPropagation();
+                                modalBody.scrollTo({
+                                    top: mark.offsetTop - (containerHeight / 3),
+                                    behavior: 'smooth'
+                                });
+                            };
+                            markerTrack.appendChild(marker);
+                        });
+
+                        // Tự động cuộn đến highlight đầu tiên
+                        modalBody.scrollTo({
+                            top: marks[0].offsetTop - (containerHeight / 3),
+                            behavior: 'smooth'
+                        });
+                    }
+                }, 150);
+            }
+        }
+
+        function highlightElementTextNodes(element, searchWords) {
+            const childNodes = Array.from(element.childNodes);
+            const startTag = "\uE000";
+            const endTag = "\uE001";
+
+            childNodes.forEach(node => {
+                if (node.nodeType === 3) { // Text Node
+                    let text = node.nodeValue;
+                    let hasMatch = false;
+                    let replacedText = text;
+
+                    searchWords.forEach(word => {
+                        const accentPattern = buildAccentInsensitivePattern(word);
+                        try {
+                            const regex = new RegExp('(^|[^' + VT_LETTERS_STR + '])(' + accentPattern + ')(?!' + VT_LETTERS_CLASS + ')', 'gi');
+                            replacedText = replacedText.replace(regex, (match, p1, p2) => {
+                                hasMatch = true;
+                                return p1 + startTag + p2 + endTag;
+                            });
+                        } catch (e) { }
+                    });
+
+                    if (hasMatch) {
+                        replacedText = escapeHTML(replacedText);
+                        const startRegex = new RegExp(startTag, 'g');
+                        const endRegex = new RegExp(endTag, 'g');
+                        replacedText = replacedText.replace(startRegex, '<mark class="highlight-mark">').replace(endRegex, '</mark>');
+
+                        const span = document.createElement("span");
+                        span.innerHTML = replacedText;
+                        node.parentNode.replaceChild(span, node);
+                    }
+                } else if (node.nodeType === 1) { // Element Node
+                    if (node.tagName !== 'MARK') {
+                        highlightElementTextNodes(node, searchWords);
+                    }
+                }
+            });
+        }
+
+        function closeQuickView(event) {
+            if (event && event.target !== document.getElementById("quickViewOverlay")) {
+                return;
+            }
+            document.getElementById("quickViewOverlay").style.display = "none";
+            document.body.style.overflow = ""; // Restore scrolling body
+        }
+
+        // Close modal on ESC keypress
+        document.addEventListener("keydown", function (event) {
+            if (event.key === "Escape") {
+                closeQuickView();
+            }
+        });
+
+        /* BACKGROUND CANVAS PARTICLES - HIGH PERFORMANCE LIGHT THEME */
+        const canvas = document.getElementById('hero-canvas');
+        const ctx = canvas.getContext('2d');
+
+        let particles = [];
+        let width = canvas.width = window.innerWidth;
+        let height = canvas.height = window.innerHeight;
+
+        window.addEventListener('resize', () => {
+            width = canvas.width = window.innerWidth;
+            height = canvas.height = window.innerHeight;
+        });
+
+        class Particle {
+            constructor() {
+                this.reset();
+            }
+
+            reset() {
+                this.x = Math.random() * width;
+                this.y = Math.random() * height;
+                this.size = Math.random() * 3 + 1;
+                this.speedX = Math.random() * 0.1 - 0.05;
+                this.speedY = Math.random() * 0.2 + 0.05;
+                this.color = Math.random() > 0.5 ? 'rgba(99, 102, 241, 0.22)' : 'rgba(14, 165, 233, 0.22)';
+                this.targetX = null;
+                this.targetY = null;
+                this.attracted = false;
+            }
+
+            update() {
+                if (this.attracted && this.targetX !== null && this.targetY !== null) {
+                    const dx = this.targetX - this.x;
+                    const dy = this.targetY - this.y;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+
+                    if (dist > 5) {
+                        this.x += dx * 0.08;
+                        this.y += dy * 0.08;
+                    } else {
+                        this.color = 'rgba(16, 185, 129, 0.5)';
+                        this.speedX = Math.random() * 6 - 3;
+                        this.speedY = Math.random() * 6 - 3;
+                        this.attracted = false;
+                    }
+                } else {
+                    this.x += this.speedX;
+                    this.y += this.speedY;
+
+                    if (this.x < 0 || this.x > width) this.speedX *= -1;
+                    if (this.y < 0 || this.y > height) this.speedY *= -1;
+                }
+            }
+
+            draw() {
+                ctx.beginPath();
+                ctx.ellipse(this.x, this.y, this.size * 0.15, this.size * 4, 0, 0, Math.PI * 2);
+                ctx.fillStyle = this.color;
+                ctx.fill();
+            }
+        }
+
+        // Nạp lại database tìm kiếm khi chuyển folder
+        function reloadSearchDatabase() {
+            const oldScript = document.querySelector('script[src^="search_db.js"]');
+            if (oldScript) {
+                oldScript.remove();
+            }
+            const script = document.createElement('script');
+            script.src = "search_db.js";
+            script.charset = "utf-8";
+            script.onload = function() {
+                if (typeof SEARCH_DB !== "undefined") {
+                    buildDashboardStats();
+                    buildVocabulary();
+                }
+            };
+            document.head.appendChild(script);
+        }
+
+        // Kiểm tra trạng thái đã quét hay chưa và cập nhật UI
+        function checkAndRegisterFolderStatus(folderPath) {
+            if (window.pywebview && window.pywebview.api && window.pywebview.api.check_folder_status) {
+                window.pywebview.api.check_folder_status(folderPath).then(function (res) {
+                    const scanBtn = document.getElementById("scanBtn");
+                    const docCountBtn = document.getElementById("docCountBtn");
+                    const tooltipText = document.getElementById("scanTooltipText");
+
+                    if (res.scanned) {
+                        if (scanBtn) scanBtn.classList.remove("glow-breathe");
+                        if (docCountBtn) docCountBtn.textContent = `${res.total_entries} tài liệu`;
+                        if (tooltipText) tooltipText.textContent = "Thư mục đã được quét & index. Sẵn sàng tra cứu!";
+                        reloadSearchDatabase();
+                    } else {
+                        if (scanBtn) scanBtn.classList.add("glow-breathe");
+                        if (docCountBtn) docCountBtn.textContent = `0 tài liệu`;
+                        if (tooltipText) tooltipText.textContent = "Thư mục chưa được quét. Vui lòng bấm 'Quét và index'.";
+                        if (typeof SEARCH_DB !== "undefined") {
+                            SEARCH_DB.length = 0;
+                            buildDashboardStats();
+                            buildVocabulary();
+                        }
+                    }
+                }).catch(function (err) {
+                    console.error("Lỗi check_folder_status:", err);
+                });
+            }
+        }
+
+        let isPaused = false;
+
+        function togglePauseResume() {
+            const pauseIcon = document.getElementById("pauseIcon");
+            const playIcon = document.getElementById("playIcon");
+            const btn = document.getElementById("pauseResumeBtn");
+            const title = document.getElementById("progressTitleText");
+            if (!btn || !title) return;
+
+            if (!isPaused) {
+                if (window.pywebview && window.pywebview.api && window.pywebview.api.pause_scan) {
+                    window.pywebview.api.pause_scan().then(function (res) {
+                        if (res.success) {
+                            isPaused = true;
+                            if (pauseIcon) pauseIcon.style.display = "none";
+                            if (playIcon) playIcon.style.display = "block";
+                            btn.title = "Tiếp tục quét";
+                            title.textContent = "Đang tạm dừng quét...";
+                        }
+                    });
+                }
+            } else {
+                if (window.pywebview && window.pywebview.api && window.pywebview.api.resume_scan) {
+                    window.pywebview.api.resume_scan().then(function (res) {
+                        if (res.success) {
+                            isPaused = false;
+                            if (pauseIcon) pauseIcon.style.display = "block";
+                            if (playIcon) playIcon.style.display = "none";
+                            btn.title = "Tạm dừng quét";
+                            title.textContent = "Đang quét tài liệu...";
+                        }
+                    });
+                }
+            }
+        }
+
+        function abortScan() {
+            const abortBtn = document.getElementById("abortBtn");
+            const pauseResumeBtn = document.getElementById("pauseResumeBtn");
+            const title = document.getElementById("progressTitleText");
+
+            if (abortBtn) abortBtn.disabled = true;
+            if (pauseResumeBtn) pauseResumeBtn.disabled = true;
+            if (title) title.textContent = "Đang hủy bỏ quét...";
+
+            if (window.pywebview && window.pywebview.api && window.pywebview.api.abort_scan) {
+                window.pywebview.api.abort_scan();
+            }
+        }
+
+        // Select folder action
+        function selectFolder() {
+            if (window.pywebview && window.pywebview.api && window.pywebview.api.select_folder) {
+                window.pywebview.api.select_folder().then(function (result) {
+                    if (result.success) {
+                        updateFolderUI(result.folder_path);
+                        if (result.scanned) {
+                            const scanBtn = document.getElementById("scanBtn");
+                            const docCountBtn = document.getElementById("docCountBtn");
+                            const tooltipText = document.getElementById("scanTooltipText");
+                            if (scanBtn) scanBtn.classList.remove("glow-breathe");
+                            if (docCountBtn) docCountBtn.textContent = `${result.total_entries} tài liệu`;
+                            if (tooltipText) tooltipText.textContent = "Thư mục đã được quét & index. Sẵn sàng tra cứu!";
+                            reloadSearchDatabase();
+                        } else {
+                            const scanBtn = document.getElementById("scanBtn");
+                            const docCountBtn = document.getElementById("docCountBtn");
+                            const tooltipText = document.getElementById("scanTooltipText");
+                            if (scanBtn) scanBtn.classList.add("glow-breathe");
+                            if (docCountBtn) docCountBtn.textContent = `0 tài liệu`;
+                            if (tooltipText) tooltipText.textContent = "Thư mục chưa được quét. Vui lòng bấm 'Quét và index'.";
+                            if (typeof SEARCH_DB !== "undefined") {
+                                SEARCH_DB.length = 0;
+                                buildDashboardStats();
+                                buildVocabulary();
+                            }
+                        }
+                    } else if (result.error && result.error !== "Đã hủy chọn thư mục") {
+                        showLgAlert("Lỗi: " + result.error, "Lỗi chọn thư mục");
+                    }
+                }).catch(function (err) {
+                    showLgAlert("Lỗi kết nối Python: " + err, "Lỗi");
+                });
+            } else {
+                showLgAlert("Tính năng chọn thư mục chỉ khả dụng khi chạy trên ứng dụng SuperSearch (EXE).", "Thông báo");
+            }
+        }
+
+        // Initialize folder config
+        function initFolderConfig() {
+            if (window.pywebview && window.pywebview.api && window.pywebview.api.get_scan_folder) {
+                window.pywebview.api.get_scan_folder().then(function (result) {
+                    if (result.folder_path) {
+                        updateFolderUI(result.folder_path);
+                        checkAndRegisterFolderStatus(result.folder_path);
+                    } else {
+                        updateFolderUI("");
+                        checkAndRegisterFolderStatus("");
+                    }
+                });
+            }
+        }
+
+        // Update Folder Path UI
+        function updateFolderUI(path) {
+            const footerEl = document.getElementById("footerScanFolderText");
+            if (footerEl) {
+                footerEl.textContent = "Thư mục quét: " + (path ? path : "Mặc định (Thư mục ứng dụng)");
+            }
+            const textEl = document.getElementById("currentScanFolderText");
+            if (!textEl) return;
+            if (path) {
+                textEl.textContent = path;
+                textEl.title = path;
+            } else {
+                textEl.textContent = "Mặc định (Thư mục ứng dụng)";
+                textEl.title = "Thư mục ứng dụng";
+            }
+        }
+
+        // Initialize particles
+        const particleCount = 60;
+        for (let i = 0; i < particleCount; i++) {
+            particles.push(new Particle());
+        }
+
+        // Animation Loop
+        function animate() {
+            ctx.clearRect(0, 0, width, height);
+            particles.forEach(p => {
+                p.update();
+                p.draw();
+            });
+            requestAnimationFrame(animate);
+        }
+        animate();
+    </script>
+</body>
+
+</html>
