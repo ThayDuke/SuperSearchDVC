@@ -4,8 +4,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SuperSearch - Tra cứu tài liệu siêu tốc</title>
+    <title>SuperSearch - Tra cứu tài liệu siêu tốc CICT</title>
     <link rel="icon" type="image/x-icon" href="LogoSS32.ico">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@700;800&display=swap" rel="stylesheet">
     <style>
         :root {
             /* Pearl Light Theme (Mặc định) */
@@ -19,6 +22,7 @@
             --accent-blue: #3b82f6;
             --accent-purple: #8b5cf6;
             --accent-pink: #ec4899;
+            --font-label: "Be Vietnam Pro", "Segoe UI", Arial, sans-serif;
             --font-sans: "Segoe UI", Arial, sans-serif;
             --font-mono: Consolas, "Courier New", monospace;
             --radius-outer: 24px;
@@ -718,6 +722,7 @@
         }
 
         .answer-title {
+            font-family: var(--font-label);
             font-size: 0.9rem;
             font-weight: 800;
             color: var(--text-primary);
@@ -737,6 +742,7 @@
         }
 
         .answer-toggle-btn {
+            font-family: var(--font-label);
             font-size: 10px;
             font-weight: 800;
             text-transform: uppercase;
@@ -1960,7 +1966,7 @@
         <div class="landing-only">
             <div class="logo-container">
                 <div class="logo-title">SuperSearch</div>
-                <div class="logo-sub">Hệ thống tra cứu tài liệu siêu tốc</div>
+                <div class="logo-sub">Hệ thống tra cứu tài liệu siêu tốc CICT</div>
             </div>
         </div>
 
@@ -3506,6 +3512,13 @@
         function renderExtractiveAnswer(searchWords) {
             const panel = document.getElementById("answerPanel");
             if (!panel) return;
+
+            // Tự động ẩn gợi ý khi người dùng sử dụng bộ lọc ở sidebar hoặc ô lọc kết quả
+            if (selectedDocExt || selectedDocYear || selectedDomain || filterQuery) {
+                panel.classList.remove("show");
+                return;
+            }
+
             panel.classList.remove("is-collapsed");
 
             const answer = buildExtractiveAnswer(searchWords);

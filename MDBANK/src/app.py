@@ -4,6 +4,13 @@ import sys
 # Thêm đường dẫn Lib vào sys.path để nạp thư viện ngoài cục bộ
 if getattr(sys, 'frozen', False):
     lib_dir = os.path.join(os.path.dirname(os.path.abspath(sys.executable)), 'src', 'Lib')
+    if hasattr(sys, '_MEIPASS'):
+        if hasattr(os, 'add_dll_directory'):
+            try:
+                os.add_dll_directory(sys._MEIPASS)
+            except Exception:
+                pass
+        os.environ['PATH'] = sys._MEIPASS + os.pathsep + os.environ.get('PATH', '')
 else:
     lib_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'Lib')
 

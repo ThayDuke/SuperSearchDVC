@@ -1,5 +1,6 @@
 {
   "D:\\CICT BACKUP\\CICT PROCEDURES\\MDBANK": 688,
   "C:\\Users\\DUKE NGUYEN\\Desktop\\3. Các dự án tiếp": 84,
-  "C:\\Users\\DUKE NGUYEN\\Desktop\\KANG tieng anh ky 2 lop 6": 22
+  "C:\\Users\\DUKE NGUYEN\\Desktop\\KANG tieng anh ky 2 lop 6": 22,
+  "H:\\My Drive\\1. DEC-Good": 83
 }
