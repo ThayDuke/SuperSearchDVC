@@ -1,0 +1,45 @@
+# System files
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# Temporary & Log files
+*.log
+*.tmp
+*.bak
+CONVERSION_LOGS/
+
+# Python caching & compiled files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+build_temp/
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Agent metadata
+.codex/
+
+# User private data
+UserData/
+1CICTDATA/
+MARKDOWN/
+
+# SuperSearch runtime data and local build artifacts
+runtime/
+data/search_db*.js
+data/folder_path.txt
+data/SSFolder.txt
+logs/*.txt
+SuperSearch_Portable*.zip
+.vscode/
+src/opendataloader-pdf/
+build_artifacts/
+src/build_temp/
+src/Lib/
+SuperSearch_Portable_Temp/
