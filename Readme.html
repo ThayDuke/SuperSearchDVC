@@ -583,7 +583,7 @@
                     <div class="info-card">
                         <div class="card-icon">📂</div>
                         <h3 class="card-title">Xem Trước Nội Dung (Quick Preview)</h3>
-                        <p class="card-desc">Hỗ trợ đọc nhanh nội dung của tệp tin Markdown hoặc PDF trực tiếp ngay trong ứng dụng với khả năng làm nổi bật (highlight) từ khóa truy vấn thông minh.</p>
+                        <p class="card-desc">Hỗ trợ đọc nhanh nội dung của tệp tin Markdown, PDF, HTML hoặc HTM trực tiếp ngay trong ứng dụng với khả năng làm nổi bật (highlight) từ khóa truy vấn thông minh.</p>
                     </div>
                     <div class="info-card">
                         <div class="card-icon">🏷️</div>
@@ -605,6 +605,9 @@
                     <li><strong>LocalOcrImageConverter:</strong> Tự động nhận diện chữ quang học trên các tệp ảnh (PNG, JPG, JPEG) bằng công nghệ OCR đa luồng.</li>
                     <li><strong>LocalDocConverter (Heuristic Anti-CJK):</strong> Đọc tệp Word cũ (<code>.doc</code>) bằng <code>olefile</code>, giải mã UTF-16LE, khôi phục các ký tự ANSI lỗi và lọc bỏ hoàn toàn các ký tự nhiễu tiếng Trung CJK để trích xuất văn bản tiếng Việt/Anh chính xác.</li>
                     <li><strong>LocalXlsConverter:</strong> Đọc bảng dữ liệu Excel cũ (<code>.xls</code>) bằng <code>xlrd</code> và chuyển đổi cấu trúc thành các bảng Markdown tiêu chuẩn.</li>
+                    <li><strong>HtmlConverter:</strong> Đọc các tệp HTML/HTM cục bộ, chuyển nội dung hiển thị (tiêu đề, đoạn văn, danh sách, bảng và nhãn liên kết) thành Markdown; bỏ qua script/style, không chạy JavaScript và không tải tài nguyên mạng.</li>
+                    <li><strong>MarkItDown Local Core:</strong> Index TXT, TEXT, MARKDOWN, JSON, JSONL, CSV, XML, RSS, ATOM, EPUB, IPYNB, MSG và ZIP. Ảnh BMP/TIF/TIFF dùng OCR Tesseract cục bộ. Audio, URL, Azure, LLM và plugin bên thứ ba mặc định bị tắt.</li>
+                    <li><strong>ZIP Safety:</strong> Từ chối ZIP mã hóa, đường dẫn bất thường, entry quá lớn, tỷ lệ nén nguy hiểm và archive lồng quá sâu; không giải nén vào thư mục nguồn.</li>
                 </ul>
 
                 <h2 class="block-title">2. Quản Lý Tài Nguyên Thông Minh (RAM-Aware Multi-threading)</h2>

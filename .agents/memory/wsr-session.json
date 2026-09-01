@@ -1,0 +1,6 @@
+{
+  "workflow": "/pl",
+  "plan": "DOCS/Planning/planning_markitdown_full_support.md",
+  "capability": "markitdown-local-core",
+  "updated": "2026-09-01T18:14:00+07:00"
+}

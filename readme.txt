@@ -80,6 +80,18 @@ LocalXlsConverter:
 - Reads legacy Excel .xls files.
 - Converts table content into Markdown.
 
+HtmlConverter:
+- Reads local .html and .htm files.
+- Converts visible body content, headings, lists, tables, and link labels to Markdown.
+- Ignores script/style blocks and does not execute JavaScript or fetch remote resources.
+
+MarkItDown Local Core:
+- Supports TXT, TEXT, MARKDOWN, JSON, JSONL, CSV, XML, RSS, ATOM, EPUB, IPYNB, MSG, and ZIP.
+- Supports BMP, TIF, and TIFF through the existing local Tesseract OCR pipeline.
+- Uses local-only conversion; audio, URL, Azure, LLM, and third-party plugins are disabled.
+- Rejects oversized files, encrypted ZIP files, unsafe paths, abnormal compression, and excessive nesting.
+- Reports unavailable dependencies and conversion error categories to the interface.
+
 
 Resource Management
 -------------------

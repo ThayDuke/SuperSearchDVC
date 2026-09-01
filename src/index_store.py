@@ -8,6 +8,7 @@ import hashlib
 import os
 import sqlite3
 import threading
+from contextlib import contextmanager
 
 
 class IndexStore:
@@ -24,8 +25,17 @@ class IndexStore:
         connection.execute("PRAGMA foreign_keys=ON")
         return connection
 
+    @contextmanager
+    def _connection(self):
+        connection = self._connect()
+        try:
+            with connection:
+                yield connection
+        finally:
+            connection.close()
+
     def _initialize(self):
-        with self._lock, self._connect() as connection:
+        with self._lock, self._connection() as connection:
             connection.executescript(
                 """
                 CREATE TABLE IF NOT EXISTS documents (
@@ -78,7 +88,7 @@ class IndexStore:
 
     def replace_entries(self, entries):
         """Replace the complete logical index in one transaction."""
-        with self._lock, self._connect() as connection:
+        with self._lock, self._connection() as connection:
             connection.execute("DELETE FROM documents_fts")
             connection.execute("DELETE FROM documents")
             for entry in entries:
@@ -134,7 +144,7 @@ class IndexStore:
         select_fields = "documents.document_id, documents.scan_id, documents.title, documents.title_clean, documents.relative_path, documents.original_path, documents.absolute_original_path, documents.domain, documents.doc_type, documents.language, documents.year, documents.file_year, documents.file_month, documents.source_type, documents.ocr_quality_score, documents.word_count, documents.source_size, documents.source_mtime_ns, documents.source_sha256"
         order_clause = "bm25(documents_fts, 5.0, 1.0), documents.title COLLATE NOCASE" if query else "documents.title COLLATE NOCASE"
         snippet_field = ", snippet(documents_fts, 1, '<mark>', '</mark>', '…', 18) AS snippet" if query else ""
-        with self._lock, self._connect() as connection:
+        with self._lock, self._connection() as connection:
             try:
                 total = connection.execute(f"SELECT COUNT(*) FROM {from_clause} {predicate}", params).fetchone()[0]
                 rows = connection.execute(
@@ -157,17 +167,17 @@ class IndexStore:
         return {"total": total, "page": page, "page_size": page_size, "documents": [dict(row) for row in rows]}
 
     def get_document(self, document_id):
-        with self._lock, self._connect() as connection:
+        with self._lock, self._connection() as connection:
             row = connection.execute("SELECT * FROM documents WHERE document_id = ?", (document_id,)).fetchone()
         return dict(row) if row else None
 
     def count_documents(self):
-        with self._lock, self._connect() as connection:
+        with self._lock, self._connection() as connection:
             return int(connection.execute("SELECT COUNT(*) FROM documents").fetchone()[0])
 
     def is_known_path(self, path):
         normalized = os.path.normcase(os.path.normpath(os.path.abspath(path)))
-        with self._lock, self._connect() as connection:
+        with self._lock, self._connection() as connection:
             row = connection.execute(
                 "SELECT 1 FROM documents WHERE lower(absolute_original_path) = lower(?) OR lower(relative_path) = lower(?) LIMIT 1",
                 (normalized, normalized.replace('\\', '/')),
@@ -175,7 +185,7 @@ class IndexStore:
         return row is not None
 
     def vocabulary(self, limit=5000):
-        with self._lock, self._connect() as connection:
+        with self._lock, self._connection() as connection:
             rows = connection.execute(
                 "SELECT title_clean FROM documents ORDER BY rowid LIMIT ?", (int(limit),)
             ).fetchall()
@@ -183,7 +193,7 @@ class IndexStore:
 
     def stats(self):
         """Return lightweight counts used by the UI without loading document text."""
-        with self._lock, self._connect() as connection:
+        with self._lock, self._connection() as connection:
             total = int(connection.execute("SELECT COUNT(*) FROM documents").fetchone()[0])
             domains = connection.execute(
                 "SELECT domain, COUNT(*) AS count FROM documents "

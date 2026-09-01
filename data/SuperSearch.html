@@ -2147,6 +2147,11 @@
                 </div>
                 <div style="margin-bottom: 0.5rem; font-weight: 600; font-size: 0.9rem;">Nhập đường dẫn LAN thủ công:</div>
                 <input type="text" id="manualFolderPathInput" class="search-box" style="width: 100%; box-sizing: border-box; padding: 10px; border-radius: 8px; font-size: 0.95rem;" placeholder="\\Server\Share hoặc Z:\Data" autocomplete="off">
+                <div style="margin-top: 1rem; padding: 10px 12px; border: 1px solid var(--glass-border); border-radius: 10px; color: var(--text-secondary); font-size: 0.82rem;">
+                    <strong style="color: var(--text-primary);">Định dạng local đang bật</strong>
+                    <div id="supportedFormatsInfo" style="margin-top: 4px; line-height: 1.5;">Đang kiểm tra capability...</div>
+                    <div style="margin-top: 4px;">Audio, URL, Azure và LLM đang tắt để giữ chế độ offline.</div>
+                </div>
             </div>
             <div class="modal-footer" style="border-top: 1px solid var(--glass-border); padding-top: 0.75rem; display: flex; justify-content: flex-end; gap: 10px;">
                 <button class="landing-btn" onclick="closeFolderModal()" style="background: transparent; color: var(--text-color); border: 1px solid var(--glass-border); padding: 6px 14px; font-size: 0.9rem; min-height: 36px;">Hủy</button>
@@ -2608,7 +2613,11 @@
                 window.pywebview.api.scan_and_index().then(function (result) {
                     if (result.success) {
                         updateScanProgress(100, []);
-                        showScanTooltip(`Đã quét xong! Thêm mới ${result.new_files} file. Tổng cộng ${result.total_entries} tài liệu.`);
+                        const skipped = Number(result.error_count || 0);
+                        const summary = result.error_summary || {};
+                        const details = Object.entries(summary).map(([key, value]) => `${key}: ${value}`).join(", ");
+                        const skippedText = skipped > 0 ? ` Bỏ qua ${skipped} file${details ? ` (${details})` : ""}.` : "";
+                        showScanTooltip(`Đã quét xong! Thêm mới ${result.new_files} file. Tổng cộng ${result.total_entries} tài liệu.${skippedText}`);
                         setTimeout(() => {
                             location.reload();
                         }, 3500);
@@ -4577,6 +4586,7 @@
         function initFolderConfig() {
             backendMode = Boolean(window.pywebview && window.pywebview.api && window.pywebview.api.search_documents);
             if (backendMode) loadBackendIndex();
+            loadSupportedFormats();
             if (window.pywebview && window.pywebview.api && window.pywebview.api.get_scan_folder) {
                 window.pywebview.api.get_scan_folder().then(function (result) {
                     if (result.folder_path) {
@@ -4588,6 +4598,19 @@
                     }
                 });
             }
+        }
+
+        function loadSupportedFormats() {
+            const target = document.getElementById("supportedFormatsInfo");
+            const api = window.pywebview && window.pywebview.api;
+            if (!target || !api || !api.get_supported_formats) return;
+            api.get_supported_formats().then(function (result) {
+                const formats = Array.isArray(result.enabled_extensions) ? result.enabled_extensions : [];
+                const version = result.markitdown_version || "không rõ";
+                target.textContent = `MarkItDown ${version}: ${formats.join(", ")}`;
+            }).catch(function () {
+                target.textContent = "Không thể đọc capability từ backend.";
+            });
         }
 
         // Update Folder Path UI

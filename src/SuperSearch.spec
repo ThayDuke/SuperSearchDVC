@@ -9,6 +9,8 @@ a = Analysis(
     ['app.py'],
     pathex=[SPEC_DIR],
     binaries=[],
+    # UI and Tesseract remain external runtime assets so UI changes do not
+    # trigger a large one-file rebuild and the OCR DLLs are not duplicated.
     datas=MAGIKA_DATAS,
     hiddenimports=[
         'xml.dom', 'xml.dom.minidom', 'xml.sax', 'xml.sax.expatreader', 'xml.parsers.expat',

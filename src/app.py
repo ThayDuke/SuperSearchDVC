@@ -37,14 +37,74 @@ except Exception:
     pass
 
 import io
+import importlib.util
+import zipfile
+from importlib.metadata import version as package_version
 import pytesseract
 import pdfplumber
 from PIL import Image
 import olefile
 import xlrd
-from markitdown import MarkItDown, DocumentConverter, DocumentConverterResult
+from markitdown import (
+    MarkItDown,
+    DocumentConverter,
+    DocumentConverterResult,
+    StreamInfo,
+    UnsupportedFormatException,
+    FileConversionException,
+    MissingDependencyException,
+)
 import unicodedata
 from index_store import IndexStore
+
+
+LOCAL_CORE_FORMAT_GROUPS = {
+    "documents": (
+        ".pdf", ".doc", ".docx", ".xls", ".xlsx", ".pptx",
+        ".html", ".htm", ".epub", ".ipynb", ".msg",
+    ),
+    "text": (
+        ".md", ".markdown", ".txt", ".text", ".json", ".jsonl",
+        ".csv", ".xml", ".rss", ".atom",
+    ),
+    "images": (".png", ".jpg", ".jpeg", ".bmp", ".tif", ".tiff"),
+    "archives": (".zip",),
+}
+SUPPORTED_EXTENSIONS = frozenset(
+    extension
+    for extensions in LOCAL_CORE_FORMAT_GROUPS.values()
+    for extension in extensions
+)
+IMAGE_EXTENSIONS = frozenset(LOCAL_CORE_FORMAT_GROUPS["images"])
+FORMAT_DEPENDENCIES = {
+    ".pdf": ("pdfplumber", "pytesseract", "PIL"),
+    ".doc": ("olefile",),
+    ".docx": ("mammoth", "lxml"),
+    ".xls": ("xlrd",),
+    ".xlsx": ("pandas", "openpyxl"),
+    ".pptx": ("pptx",),
+    ".msg": ("olefile",),
+    ".png": ("pytesseract", "PIL"),
+    ".jpg": ("pytesseract", "PIL"),
+    ".jpeg": ("pytesseract", "PIL"),
+    ".bmp": ("pytesseract", "PIL"),
+    ".tif": ("pytesseract", "PIL"),
+    ".tiff": ("pytesseract", "PIL"),
+}
+DEFAULT_SOURCE_LIMIT_BYTES = 512 * 1024 * 1024
+IMAGE_SOURCE_LIMIT_BYTES = 100 * 1024 * 1024
+ZIP_SOURCE_LIMIT_BYTES = 256 * 1024 * 1024
+ZIP_MAX_ENTRIES = 500
+ZIP_MAX_ENTRY_BYTES = 100 * 1024 * 1024
+ZIP_MAX_TOTAL_BYTES = 500 * 1024 * 1024
+ZIP_MAX_COMPRESSION_RATIO = 200
+ZIP_MAX_DEPTH = 3
+
+
+class ConversionPolicyError(RuntimeError):
+    def __init__(self, code, message):
+        super().__init__(message)
+        self.code = code
 
 def remove_diacritics(text):
     if not text:
@@ -56,19 +116,29 @@ def remove_diacritics(text):
 
 
 def configure_tesseract(api):
-    """Select the bundled Tesseract binary before an OCR operation."""
-    if getattr(sys, 'frozen', False):
-        local_meipass = os.path.join(api.base_dir_meipass, 'src', 'Tesseract-OCR')
-        local_exe = os.path.join(api.base_dir_exe, 'src', 'Tesseract-OCR')
-    else:
-        local_meipass = os.path.join(api.base_dir_meipass, 'Tesseract-OCR')
-        local_exe = os.path.join(api.base_dir_exe, 'Tesseract-OCR')
-
-    candidates = [
-        (os.path.join(local_meipass, 'tesseract.exe'), os.path.join(local_meipass, 'tessdata')),
-        (os.path.join(local_exe, 'tesseract.exe'), os.path.join(local_exe, 'tessdata')),
-        (r'C:\Program Files\Tesseract-OCR\tesseract.exe', None),
+    """Select an external Tesseract binary before an OCR operation."""
+    roots = [
+        api.base_dir,
+        api.base_dir_exe,
+        api.base_dir_meipass,
+        os.path.dirname(api.base_dir),
+        os.path.dirname(api.base_dir_exe),
     ]
+    candidates = []
+    seen = set()
+    for root in roots:
+        if not root:
+            continue
+        for relative in ('src/Tesseract-OCR', 'Tesseract-OCR'):
+            tess_root = os.path.join(root, relative)
+            if tess_root in seen:
+                continue
+            seen.add(tess_root)
+            candidates.append((
+                os.path.join(tess_root, 'tesseract.exe'),
+                os.path.join(tess_root, 'tessdata'),
+            ))
+    candidates.append((r'C:\Program Files\Tesseract-OCR\tesseract.exe', None))
     for tesseract_path, tessdata_path in candidates:
         if os.path.exists(tesseract_path):
             pytesseract.pytesseract.tesseract_cmd = tesseract_path
@@ -138,7 +208,7 @@ class LocalOcrImageConverter(DocumentConverter):
 
     def accepts(self, file_stream, stream_info, **kwargs):
         ext = (stream_info.extension or "").lower()
-        return ext in ['.png', '.jpg', '.jpeg']
+        return ext in IMAGE_EXTENSIONS
 
     def convert(self, file_stream, stream_info, **kwargs):
         configure_tesseract(self.api)
@@ -264,6 +334,87 @@ class LocalXlsConverter(DocumentConverter):
             return DocumentConverterResult(markdown="".join(md_content))
         except Exception as e:
             return DocumentConverterResult(markdown=f"Error during local XLS extraction: {str(e)}")
+
+
+class SafeZipConverter(DocumentConverter):
+    """Bounded in-memory ZIP conversion that never extracts into the source tree."""
+
+    def __init__(self, markitdown):
+        super().__init__()
+        self.markitdown = markitdown
+
+    def accepts(self, file_stream, stream_info, **kwargs):
+        return (stream_info.extension or "").lower() == ".zip"
+
+    @staticmethod
+    def _validate_member(info):
+        name = info.filename.replace("\\", "/")
+        parts = [part for part in name.split("/") if part not in ("", ".")]
+        if not name or name.startswith("/") or (parts and ":" in parts[0]) or ".." in parts:
+            raise ConversionPolicyError("unsafe_archive", f"Đường dẫn ZIP không an toàn: {info.filename}")
+        if info.flag_bits & 0x1:
+            raise ConversionPolicyError("unsafe_archive", f"ZIP mã hóa không được hỗ trợ: {info.filename}")
+        if info.file_size > ZIP_MAX_ENTRY_BYTES:
+            raise ConversionPolicyError("unsafe_archive", f"Entry ZIP quá lớn: {info.filename}")
+        compressed = max(1, info.compress_size)
+        if info.file_size / compressed > ZIP_MAX_COMPRESSION_RATIO:
+            raise ConversionPolicyError("unsafe_archive", f"Tỷ lệ nén ZIP bất thường: {info.filename}")
+
+    def convert(self, file_stream, stream_info, **kwargs):
+        depth = int(kwargs.get("_archive_depth", 0))
+        if depth >= ZIP_MAX_DEPTH:
+            raise ConversionPolicyError("unsafe_archive", "ZIP lồng vượt quá giới hạn an toàn.")
+
+        try:
+            archive = zipfile.ZipFile(file_stream, "r")
+        except (OSError, zipfile.BadZipFile) as exc:
+            raise ConversionPolicyError("unsafe_archive", f"ZIP không hợp lệ: {exc}") from exc
+
+        sections = []
+        with archive:
+            members = [info for info in archive.infolist() if not info.is_dir()]
+            if len(members) > ZIP_MAX_ENTRIES:
+                raise ConversionPolicyError("unsafe_archive", "ZIP có quá nhiều entry.")
+            total_size = sum(info.file_size for info in members)
+            if total_size > ZIP_MAX_TOTAL_BYTES:
+                raise ConversionPolicyError("unsafe_archive", "Tổng dung lượng giải nén ZIP vượt giới hạn.")
+
+            for info in members:
+                self._validate_member(info)
+                extension = os.path.splitext(info.filename)[1].lower()
+                if extension not in SUPPORTED_EXTENSIONS:
+                    continue
+                try:
+                    payload = archive.read(info)
+                    member_stream = io.BytesIO(payload)
+                    member_info = StreamInfo(
+                        extension=extension,
+                        filename=os.path.basename(info.filename),
+                    )
+                    if extension == ".zip":
+                        result = self.convert(
+                            member_stream,
+                            member_info,
+                            _archive_depth=depth + 1,
+                        )
+                    else:
+                        result = self.markitdown.convert_stream(
+                            member_stream,
+                            stream_info=member_info,
+                            _archive_depth=depth + 1,
+                        )
+                    content = (result.text_content or "").strip()
+                    if content:
+                        sections.append(f"## File: {info.filename}\n\n{content}")
+                except ConversionPolicyError:
+                    raise
+                except (UnsupportedFormatException, FileConversionException, MissingDependencyException):
+                    continue
+
+        title = stream_info.filename or stream_info.local_path or "archive.zip"
+        if not sections:
+            raise ConversionPolicyError("conversion_failed", "ZIP không chứa tài liệu hỗ trợ có nội dung.")
+        return DocumentConverterResult(markdown=f"# ZIP: {title}\n\n" + "\n\n".join(sections))
 
 class MEMORYSTATUSEX(ctypes.Structure):
     _fields_ = [
@@ -514,6 +665,43 @@ class Api:
     def get_index_stats(self):
         return self.index_store.stats()
 
+    def get_supported_formats(self):
+        groups = []
+        enabled_extensions = []
+        for group_name, extensions in LOCAL_CORE_FORMAT_GROUPS.items():
+            items = []
+            for extension in extensions:
+                missing = []
+                for dependency in FORMAT_DEPENDENCIES.get(extension, ()):
+                    try:
+                        available = importlib.util.find_spec(dependency) is not None
+                    except (ImportError, ModuleNotFoundError, ValueError):
+                        available = False
+                    if not available:
+                        missing.append(dependency)
+                items.append({
+                    "extension": extension.lstrip('.').upper(),
+                    "available": not missing,
+                    "missing_dependencies": missing,
+                })
+                if not missing:
+                    enabled_extensions.append(extension.lstrip('.').upper())
+            groups.append({"name": group_name, "formats": items})
+        try:
+            markitdown_version = package_version("markitdown")
+        except Exception:
+            markitdown_version = "unknown"
+        return {
+            "profile": "LOCAL_CORE",
+            "markitdown_version": markitdown_version,
+            "groups": groups,
+            "enabled_extensions": enabled_extensions,
+            "optional_profiles": {
+                "network": {"enabled": False, "formats": ["WAV", "MP3", "M4A", "MP4", "URL"]},
+                "cloud": {"enabled": False, "formats": ["AZURE", "LLM", "PLUGIN"]},
+            },
+        }
+
     def _report_progress(self, percent, active_list):
         if self._window:
             try:
@@ -600,10 +788,10 @@ class Api:
         if ocr_quality_score < 0.35:
             return "low_confidence_ocr"
 
-        if ext in ['.pdf', '.docx', '.xlsx', '.pptx', '.doc', '.xls', '.md']:
+        if ext in SUPPORTED_EXTENSIONS and ext not in IMAGE_EXTENSIONS:
             return "formal_document"
 
-        if ext in ['.png', '.jpg', '.jpeg']:
+        if ext in IMAGE_EXTENSIONS:
             chat_patterns = [
                 r'\b\d{1,2}:\d{2}\b', r'\b(am|pm)\b', 'tin nhắn',
                 'đã gửi', 'hôm qua', 'hôm nay', 'chúc mừng', 'sinh nhật',
@@ -674,7 +862,7 @@ class Api:
                     break
 
         ext = self._infer_original_ext(header_orig_path or relative_path)
-        is_image_ocr = ext in ['.png', '.jpg', '.jpeg']
+        is_image_ocr = ext in IMAGE_EXTENSIONS
         words = re.findall(r'\w+', cleaned)
         word_count = len(words)
 
@@ -886,6 +1074,32 @@ class Api:
             f.write(header + body)
         os.replace(temp_path, path)
 
+    @staticmethod
+    def _source_size_limit(extension):
+        if extension in IMAGE_EXTENSIONS:
+            return IMAGE_SOURCE_LIMIT_BYTES
+        if extension == ".zip":
+            return ZIP_SOURCE_LIMIT_BYTES
+        return DEFAULT_SOURCE_LIMIT_BYTES
+
+    @staticmethod
+    def _conversion_error_code(error):
+        if isinstance(error, ConversionPolicyError):
+            return error.code
+        if isinstance(error, MissingDependencyException):
+            return "missing_dependency"
+        if isinstance(error, UnsupportedFormatException):
+            return "unsupported"
+        return "conversion_failed"
+
+    @staticmethod
+    def _error_summary(errors):
+        summary = {}
+        for item in errors:
+            code = item.get("code", "conversion_failed")
+            summary[code] = summary.get(code, 0) + 1
+        return summary
+
     def scan_and_index(self):
         try:
             md_converter = MarkItDown()
@@ -920,7 +1134,7 @@ class Api:
 
         new_files_count = 0
         scan_errors = []
-        supported_extensions = ['.pdf', '.docx', '.xlsx', '.pptx', '.png', '.jpg', '.jpeg', '.doc', '.xls']
+        supported_extensions = SUPPORTED_EXTENSIONS
 
         # Xác định thư mục quét mục tiêu
         scan_target = self.scan_dir if self.scan_dir else self.base_dir
@@ -967,6 +1181,23 @@ class Api:
                     new_markdown_path = self._cache_path(dest_markdown_dir, file_path)
                     
                     expected_markdown_files.add(os.path.normpath(new_markdown_path))
+
+                    try:
+                        source_size = os.path.getsize(file_path)
+                    except OSError as error:
+                        scan_errors.append({
+                            "file": file_path,
+                            "code": "source_unreadable",
+                            "error": str(error),
+                        })
+                        continue
+                    if source_size > self._source_size_limit(ext):
+                        scan_errors.append({
+                            "file": file_path,
+                            "code": "too_large",
+                            "error": "Tệp vượt giới hạn kích thước an toàn.",
+                        })
+                        continue
                     
                     is_stale = self._markdown_needs_refresh(new_markdown_path, file_path, scan_target)
                     if is_stale:
@@ -980,26 +1211,6 @@ class Api:
                             'stage_md_path': stage_md_path,
                             'scan_target': scan_target
                         })
-                elif ext == '.md':
-                    file_path = os.path.join(root, file)
-                    
-                    rel_dir = os.path.relpath(root, scan_target)
-                    if rel_dir == '.':
-                        rel_dir = ''
-                    
-                    dest_markdown_dir = os.path.join(dest_folder_md_root, rel_dir)
-                    os.makedirs(dest_markdown_dir, exist_ok=True)
-                    new_markdown_path = self._cache_path(dest_markdown_dir, file_path)
-                    
-                    expected_markdown_files.add(os.path.normpath(new_markdown_path))
-                    
-                    if self._markdown_needs_refresh(new_markdown_path, file_path, scan_target):
-                        try:
-                            with open(file_path, 'r', encoding='utf-8', errors='ignore') as f_in:
-                                md_text = f_in.read()
-                            self._write_markdown(new_markdown_path, md_text, file_path, scan_target)
-                        except Exception as e:
-                            print(f"Error copying md file {file_path}: {e}")
 
         # Thực thi xử lý đa luồng với kiểm soát tài nguyên
         total_tasks = len(tasks)
@@ -1046,7 +1257,18 @@ class Api:
                     self._report_progress(percent, self.active_files[:4])
 
                 # convert file
-                result = md_converter.convert(src_path)
+                if os.path.splitext(src_path)[1].lower() == ".zip":
+                    with open(src_path, "rb") as archive_stream:
+                        result = SafeZipConverter(md_converter).convert(
+                            archive_stream,
+                            StreamInfo(
+                                extension=".zip",
+                                filename=os.path.basename(src_path),
+                                local_path=src_path,
+                            ),
+                        )
+                else:
+                    result = md_converter.convert_local(src_path)
                 
                 if self._scan_aborted:
                     with self.lock:
@@ -1056,9 +1278,11 @@ class Api:
                         self._report_progress(percent, self.active_files[:4])
                     return
 
-                converted_text = result.text_content or ""
+                converted_text = (result.text_content or "").strip()
                 if converted_text.lower().startswith("error during local"):
                     raise RuntimeError(converted_text)
+                if not converted_text:
+                    raise ConversionPolicyError("conversion_failed", "Bộ chuyển đổi không tạo được nội dung.")
                 self._write_markdown(stage_md_path, converted_text, src_path, task_scan_target)
                 success = True
             except Exception as e:
@@ -1066,6 +1290,7 @@ class Api:
                 with self.lock:
                     scan_errors.append({
                         "file": src_path,
+                        "code": self._conversion_error_code(e),
                         "error": str(e)
                     })
                 if os.path.exists(stage_md_path):
@@ -1138,8 +1363,6 @@ class Api:
         # 2. Quét TOÀN BỘ thư mục MARKDOWN tập trung để tạo search_db.js hợp nhất
         db_entries = []
         for root, dirs, files in os.walk(app_markdown_root):
-            if any(p in root.lower() for p in ['__pycache__', 'build', 'dist', '.git', '.gemini', '.agents']):
-                continue
             for file in files:
                 if file.startswith('~$'):
                     continue
@@ -1266,6 +1489,18 @@ class Api:
         except Exception as e:
             print(f"Error de-duplicating search db: {e}")
 
+        current_scan_entries = sum(1 for entry in db_entries if entry.get("scan_id") == scan_id)
+        if expected_markdown_files and current_scan_entries == 0:
+            return {
+                "success": False,
+                "error": "Đã tạo Markdown nhưng không tạo được tài liệu tìm kiếm; index cũ được giữ nguyên.",
+                "new_files": new_files_count,
+                "total_entries": self.index_store.count_documents(),
+                "errors": scan_errors[:50],
+                "error_count": len(scan_errors),
+                "error_summary": self._error_summary(scan_errors),
+            }
+
         # Prepare all filesystem outputs before committing SQLite.
         output_js = self.runtime_search_db
         output_tmp = f"{output_js}.tmp-{os.getpid()}"
@@ -1306,14 +1541,19 @@ class Api:
                         os.remove(temp_path)
                 except OSError:
                     pass
-            scan_errors.append({"file": self.runtime_index_db, "error": f"SQLite/runtime commit failed: {e}"})
+            scan_errors.append({
+                "file": self.runtime_index_db,
+                "code": "index_commit_failed",
+                "error": f"SQLite/runtime commit failed: {e}",
+            })
             print(f"Error committing runtime index: {e}")
             return {
                 "success": False,
                 "new_files": 0,
                 "total_entries": 0,
                 "errors": scan_errors[:50],
-                "error_count": len(scan_errors)
+                "error_count": len(scan_errors),
+                "error_summary": self._error_summary(scan_errors),
             }
 
         for md_path in orphaned_markdown_files:
@@ -1335,7 +1575,8 @@ class Api:
             "new_files": new_files_count,
             "total_entries": len(db_entries),
             "errors": scan_errors[:50],
-            "error_count": len(scan_errors)
+            "error_count": len(scan_errors),
+            "error_summary": self._error_summary(scan_errors),
         }
 
 def main():
@@ -1347,7 +1588,18 @@ def main():
 
     api = Api(base_dir)
     
-    html_path = os.path.join(base_dir, 'data', 'SuperSearch.html')
+    # Keep the UI outside the executable so HTML changes do not require a rebuild.
+    resource_roots = [base_dir, os.path.dirname(base_dir)]
+    if getattr(sys, '_MEIPASS', None):
+        resource_roots.append(sys._MEIPASS)
+    html_path = next(
+        (
+            os.path.join(root, 'data', 'SuperSearch.html')
+            for root in resource_roots
+            if os.path.isfile(os.path.join(root, 'data', 'SuperSearch.html'))
+        ),
+        os.path.join(base_dir, 'data', 'SuperSearch.html'),
+    )
     
     # Chuyển đổi thành URL file:// để tránh sử dụng Bottle local server (tránh lỗi 404)
     file_url = 'file:///' + os.path.abspath(html_path).replace('\\', '/')
