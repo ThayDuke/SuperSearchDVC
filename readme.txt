@@ -19,7 +19,7 @@ Key highlights:
 - Offline indexing.
 - Fast full-text search.
 - Quick document preview inside the application.
-- Filtering by file type, year, and keywords.
+- Filtering by file type, file creation year, and keywords.
 
 
 Core Value
@@ -54,6 +54,16 @@ Main components:
 - SQLite FTS5 index under `runtime/supersearch.db`.
 - The desktop UI queries SQLite through the embedded Python API; it does not load the full index into browser memory.
 - Bundled local Tesseract-OCR engine.
+
+
+Search and file creation year
+-----------------------------
+
+SuperSearch keeps every query token for matching, phrase proximity, ranking, and highlighting. Common words such as `and` or Vietnamese `và` are downweighted naturally by the retrieval model; they are not removed from the query. User text is treated as a literal search expression, so FTS5 operators typed by users do not change query semantics.
+
+Multi-word search combines SQLite FTS5 BM25 with exact phrase and near-term ranking signals. Search results include accent-preserving plain-text snippets, and the same query tokens are used for title, snippet, and Quick View highlighting.
+
+The `Năm tạo file` filter uses the CreationTime of the original source file on the current filesystem. It does not infer a year from the filename, document content, publication date, or last modified time. A copied file can therefore have a different creation year on another volume. Files without a reliable CreationTime are shown as `Không rõ năm tạo` and are not assigned a guessed year.
 
 
 Document Conversion Pipeline

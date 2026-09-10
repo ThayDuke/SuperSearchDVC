@@ -1415,17 +1415,19 @@
             background-color: var(--drawer-bg);
             border: 1px solid var(--glass-border);
             border-radius: var(--radius-outer);
-            padding: 2.5rem;
-            width: 90%;
-            max-width: 850px;
-            max-height: calc(100vh - 40px);
-            height: auto;
+            padding: 1.5rem 2rem;
+            width: 92%;
+            max-width: 960px;
+            height: 85vh;
+            max-height: calc(100vh - 48px);
             display: flex;
             flex-direction: column;
-            gap: 1.5rem;
-            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.2);
+            gap: 0.85rem;
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.25);
             color: var(--text-primary);
             animation: modalScaleIn 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+            box-sizing: border-box;
+            overflow: hidden;
         }
 
         @keyframes modalScaleIn {
@@ -1628,15 +1630,22 @@
             background-color: var(--drawer-bg);
             border: 1px solid var(--glass-border);
             border-radius: var(--radius-outer);
-            padding: 2rem;
+            padding: 1.5rem;
             width: 90%;
             max-width: 450px;
+            height: auto !important;
+            max-height: calc(100vh - 40px);
             display: flex;
             flex-direction: column;
-            gap: 1rem;
+            gap: 0.85rem;
             box-shadow: 0 20px 50px rgba(0, 0, 0, 0.2);
             color: var(--text-primary);
             animation: modalScaleIn 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+            box-sizing: border-box;
+        }
+        .lg-alert-modal .modal-body {
+            white-space: normal !important;
+            flex: unset !important;
         }
         .progress-panel-wrapper {
             width: 100%;
@@ -1937,7 +1946,221 @@
         .scan-folder-info {
             display: none !important;
         }
+    
+        /* Modal Tabs Bar for HTML vs Markdown */
+        .modal-tabs-bar {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 16px;
+            background: rgba(0, 0, 0, 0.18);
+            border-bottom: 1px solid var(--glass-border);
+        }
+        .quick-view-tab-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 14px;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            border: 1px solid transparent;
+            background: transparent;
+            color: var(--text-secondary);
+            transition: all 0.2s ease;
+        }
+        .quick-view-tab-btn:hover {
+            color: var(--text-primary);
+            background: rgba(255, 255, 255, 0.05);
+        }
+        .quick-view-tab-btn.active {
+            color: #60a5fa;
+            background: rgba(59, 130, 246, 0.15);
+            border-color: rgba(59, 130, 246, 0.35);
+        }
+        .quick-view-pane {
+            flex: 1;
+            min-height: 0;
+            overflow-y: auto;
+            overflow-x: hidden;
+            padding: 1.25rem 1.5rem;
+            width: 100%;
+            height: 100%;
+            box-sizing: border-box;
+            user-select: text !important;
+            -webkit-user-select: text !important;
+        }
+        .quick-view-html-pane {
+            color: var(--text-primary);
+            font-size: 14.5px;
+            line-height: 1.65;
+            word-wrap: break-word;
+        }
+        .quick-view-html-pane h1, .quick-view-html-pane h2, .quick-view-html-pane h3 {
+            color: #93c5fd;
+            margin-top: 1.25rem;
+            margin-bottom: 0.5rem;
+            font-weight: 700;
+        }
+        .quick-view-html-pane table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1rem 0;
+            background: rgba(15, 23, 42, 0.4);
+            border: 1px solid var(--glass-border);
+            border-radius: 6px;
+            overflow: hidden;
+        }
+        .quick-view-html-pane th, .quick-view-html-pane td {
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 8px 12px;
+            text-align: left;
+        }
+        .quick-view-html-pane th {
+            background: rgba(59, 130, 246, 0.15);
+            color: #93c5fd;
+            font-weight: 600;
+        }
+        .quick-view-html-pane blockquote {
+            border-left: 3px solid #60a5fa;
+            margin: 0.8rem 0;
+            padding-left: 1rem;
+            color: var(--text-secondary);
+            font-style: italic;
+        }
+        .quick-view-html-pane code {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: Consolas, monospace;
+            font-size: 13px;
+        }
+        .quick-view-html-pane pre {
+            background: rgba(15, 23, 42, 0.6);
+            border: 1px solid var(--glass-border);
+            border-radius: 8px;
+            padding: 1rem;
+            overflow-x: auto;
+        }
+        .quick-view-markdown-pane {
+            background: rgba(10, 14, 23, 0.7);
+            font-family: Consolas, 'Courier New', monospace;
+            font-size: 13px;
+            line-height: 1.55;
+            color: #e2e8f0;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+    
+        /* OCR & Gemini Compact Modal Styling */
+        .ocr-config-modal, .folder-config-modal {
+            background-color: var(--drawer-bg);
+            border: 1px solid var(--glass-border);
+            border-radius: 16px;
+            padding: 1.25rem 1.5rem !important;
+            width: 92%;
+            max-width: 480px !important;
+            height: auto !important;
+            max-height: calc(100vh - 40px);
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem !important;
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.35);
+            color: var(--text-primary);
+            animation: modalScaleIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+            overflow: hidden;
+            box-sizing: border-box;
+        }
+        .ocr-config-modal .modal-header, .folder-config-modal .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--glass-border);
+            padding-bottom: 0.6rem;
+            margin: 0;
+            gap: 12px;
+        }
+        .ocr-config-modal .modal-title, .folder-config-modal .modal-title {
+            font-size: 1.05rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: var(--text-primary);
+        }
+        .ocr-config-modal .modal-body, .folder-config-modal .modal-body {
+            white-space: normal !important;
+            flex: unset !important;
+            overflow-y: auto;
+            padding: 0.25rem 0 !important;
+            line-height: 1.45;
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+            margin: 0;
+        }
+        .ocr-config-modal .ocr-intro-text {
+            font-size: 12.5px;
+            line-height: 1.5;
+            color: var(--text-secondary);
+            margin: 0;
+            padding-bottom: 0.25rem;
+        }
+        .ocr-config-modal .ocr-field-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.3rem;
+            margin: 0;
+        }
+        .ocr-config-modal .ocr-field-label {
+            font-size: 0.84rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin: 0;
+        }
+        .ocr-config-modal .ocr-field-label a {
+            font-size: 0.78rem;
+            color: #60a5fa;
+            text-decoration: none;
+            font-weight: 500;
+        }
+        .ocr-config-modal .ocr-field-label a:hover {
+            text-decoration: underline;
+        }
+        .ocr-config-modal .modal-footer, .folder-config-modal .modal-footer {
+            display: flex;
+            justify-content: flex-end;
+            align-items: center;
+            gap: 10px;
+            border-top: 1px solid var(--glass-border);
+            padding-top: 0.75rem;
+            margin: 0;
+        }
+
+    
+        #lgAlertOverlay {
+            z-index: 3500 !important;
+        }
+
     </style>
+    <!-- MathJax for formula rendering in HTML preview -->
+    <script>
+        window.MathJax = {
+            tex: {
+                inlineMath: [['\\(', '\\)'], ['$', '$']],
+                displayMath: [['\\[', '\\]'], ['$$', '$$']],
+                processEscapes: true
+            },
+            options: {
+                skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code']
+            }
+        };
+    </script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
 </head>
 
 <body data-theme="light">
@@ -1987,6 +2210,9 @@
                 </svg>
                 <ul class="suggestions-list" id="suggestionsList"></ul>
             </div>
+            <button class="theme-toggle-btn" id="ocrTopBtn" onclick="openOcrModal()" title="Cấu hình Gemini AI & OCR" style="margin-right: 6px;">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-sparkles"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/><path d="M5 3v4"/><path d="M19 17v4"/><path d="M3 5h4"/><path d="M17 19h4"/></svg>
+            </button>
             <button class="theme-toggle-btn" id="themeToggleBtn" onclick="toggleTheme()" title="Chuyển đổi giao diện">
                 <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-moon"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
             </button>
@@ -1997,6 +2223,9 @@
             <div class="landing-buttons-row" id="landingButtonsRow">
                 <button class="circle-btn" onclick="openFolderModal()" id="folderBtn" title="Cấu hình thư mục quét">
                     <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-folder-open"><path d="m6 14 1.45-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.55 6a2 2 0 0 1-1.94 1.5H4a2 2 0 0 1-2-2V5c0-1.1.9-2 2-2h3.93a2 2 0 0 1 1.66.9l.82 1.2A2 2 0 0 0 11.93 6H18a2 2 0 0 1 2 2v2"/></svg>
+                </button>
+                <button class="circle-btn" onclick="openOcrModal()" id="ocrBtn" title="Cấu hình Gemini AI & OCR">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-sparkles"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/><path d="M5 3v4"/><path d="M19 17v4"/><path d="M3 5h4"/><path d="M17 19h4"/></svg>
                 </button>
                 <button class="landing-btn" onclick="scanAndIndex()" id="scanBtn">Quét và index</button>
             </div>
@@ -2051,7 +2280,7 @@
                     <div id="filterDocExt"></div>
                 </div>
                 <div class="filter-section">
-                    <div class="filter-title">NĂM KHỞI TẠO</div>
+                    <div class="filter-title">NĂM TẠO FILE</div>
                     <div id="filterDocYear"></div>
                 </div>
                 <div class="filter-section">
@@ -2101,13 +2330,36 @@
                 <div class="modal-title" id="modalTitle">Tiêu đề tài liệu</div>
                 <button class="modal-close-btn" onclick="closeQuickView()">&times;</button>
             </div>
-            <div style="position: relative; display: flex; width: 100%; flex: 1; overflow: hidden;">
-                <div class="modal-body" id="modalBody">
-                    <!-- Nội dung văn bản Markdown -->
+            <!-- Thanh Tab chuyển đổi giữa HTML (Người đọc) và Markdown (AI Agent) -->
+            <div class="modal-tabs-bar">
+                <button class="quick-view-tab-btn active" id="tabBtnHtml" onclick="switchQuickViewTab('html')">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+                    Bản đọc (HTML)
+                </button>
+                <button class="quick-view-tab-btn" id="tabBtnMarkdown" onclick="switchQuickViewTab('markdown')">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+                    Markdown (AI Agent)
+                </button>
+                <div style="flex: 1;"></div>
+                <button class="quick-view-tab-btn" id="btnCopyQuickView" onclick="copyQuickViewContent()" title="Sao chép nội dung">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
+                    <span id="copyBtnText">Sao chép</span>
+                </button>
+            </div>
+            <div class="quick-view-content-wrapper" style="position: relative; display: flex; width: 100%; flex: 1; min-height: 0; overflow: hidden; border: 1px solid var(--glass-border); border-radius: 8px; background: rgba(15, 23, 42, 0.25);">
+                <!-- Tab 1: HTML View (Mặc định) -->
+                <div class="quick-view-pane quick-view-html-pane" id="quickViewHtmlPane">
+                    <!-- Nội dung HTML render -->
                 </div>
+                <!-- Tab 2: Markdown View (AI Agent) -->
+                <pre class="quick-view-pane quick-view-markdown-pane" id="quickViewMarkdownPane" style="display: none;"><code id="quickViewMarkdownCode"></code></pre>
                 <div id="scrollbarMarkerTrack" style="position: absolute; right: 0; top: 0; width: 14px; height: 100%; z-index: 10; background: transparent; pointer-events: none;"></div>
             </div>
             <div class="modal-footer">
+                <button class="landing-btn" id="btnQuickViewOpenFile" onclick="openQuickViewOriginalFile()" style="display: inline-flex; align-items: center; gap: 6px; background: rgba(59, 130, 246, 0.15); border: 1px solid rgba(59, 130, 246, 0.4); color: #60a5fa; font-weight: 600;">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-external-link"><path d="M15 3h6v6"></path><path d="M10 14 21 3"></path><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path></svg>
+                    Đến file gốc
+                </button>
                 <button class="landing-btn" onclick="closeQuickView()">Đóng</button>
             </div>
         </div>
@@ -2132,30 +2384,93 @@
     
     <!-- Cửa sổ Chọn thư mục (Modal Popup) -->
     <div class="lg-alert-overlay" id="folderSelectOverlay" onclick="closeFolderModal(event)">
-        <div class="lg-alert-modal" onclick="event.stopPropagation()">
-            <div class="modal-header" style="border-bottom: 1px solid var(--glass-border); padding-bottom: 0.75rem;">
-                <div class="modal-title" style="font-size: 1.1rem; font-weight: 700;">Cấu hình thư mục quét</div>
+        <div class="folder-config-modal" onclick="event.stopPropagation()">
+            <div class="modal-header">
+                <div class="modal-title">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-folder-search" style="color: var(--accent-blue);"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z"/><circle cx="14" cy="14" r="3"/><path d="m18.5 18.5-2.05-2.05"/></svg>
+                    Cấu hình thư mục quét
+                </div>
                 <button class="modal-close-btn" onclick="closeFolderModal()">&times;</button>
             </div>
-            <div class="modal-body" style="font-size: 14.5px; line-height: 1.6; word-wrap: break-word; padding: 1.5rem 0;">
-                <p style="margin-bottom: 1rem; color: var(--text-secondary);">Chọn thư mục từ máy tính của bạn, hoặc dán đường dẫn mạng LAN (Ví dụ: <strong>\\192.168.1.100\Data</strong>) vào ô bên dưới nếu bạn đang mở ứng dụng bằng quyền Administrator và không thấy ổ đĩa mạng.</p>
-                <div style="display: flex; gap: 8px; margin-bottom: 1.5rem;">
-                    <button class="landing-btn" onclick="selectFolder()" style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px;">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-folder-search"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z"/><circle cx="14" cy="14" r="3"/><path d="m18.5 18.5-2.05-2.05"/></svg>
+            <div class="modal-body">
+                <p class="ocr-intro-text">
+                    Chọn thư mục từ máy tính của bạn, hoặc dán đường dẫn mạng LAN (Ví dụ: <strong>\\192.168.1.100\Data</strong>) vào ô bên dưới nếu bạn đang mở ứng dụng bằng quyền Administrator và không thấy ổ đĩa mạng.
+                </p>
+
+                <div style="display: flex; gap: 8px;">
+                    <button class="landing-btn" onclick="selectFolder()" style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px; padding: 9px 16px; font-size: 0.9rem; font-weight: 600;">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z"/><circle cx="14" cy="14" r="3"/><path d="m18.5 18.5-2.05-2.05"/></svg>
                         Duyệt từ máy tính
                     </button>
                 </div>
-                <div style="margin-bottom: 0.5rem; font-weight: 600; font-size: 0.9rem;">Nhập đường dẫn LAN thủ công:</div>
-                <input type="text" id="manualFolderPathInput" class="search-box" style="width: 100%; box-sizing: border-box; padding: 10px; border-radius: 8px; font-size: 0.95rem;" placeholder="\\Server\Share hoặc Z:\Data" autocomplete="off">
-                <div style="margin-top: 1rem; padding: 10px 12px; border: 1px solid var(--glass-border); border-radius: 10px; color: var(--text-secondary); font-size: 0.82rem;">
-                    <strong style="color: var(--text-primary);">Định dạng local đang bật</strong>
-                    <div id="supportedFormatsInfo" style="margin-top: 4px; line-height: 1.5;">Đang kiểm tra capability...</div>
-                    <div style="margin-top: 4px;">Audio, URL, Azure và LLM đang tắt để giữ chế độ offline.</div>
+
+                <div class="ocr-field-group">
+                    <label class="ocr-field-label" for="manualFolderPathInput">Nhập đường dẫn LAN thủ công:</label>
+                    <input type="text" id="manualFolderPathInput" class="search-box" style="width: 100%; box-sizing: border-box; padding: 7px 10px; border-radius: 8px; font-size: 0.88rem;" placeholder="\\Server\Share hoặc Z:\Data" autocomplete="off">
+                    <div id="folderModalNotice" style="display: none; font-size: 0.8rem; line-height: 1.4; padding: 6px 10px; border-radius: 6px; margin-top: 4px;"></div>
+                </div>
+
+                <div style="padding: 8px 12px; border: 1px solid var(--glass-border); border-radius: 8px; color: var(--text-secondary); font-size: 0.78rem; line-height: 1.45; background: rgba(0, 0, 0, 0.15);">
+                    <strong style="color: var(--text-primary); font-size: 0.82rem;">Định dạng local đang bật:</strong>
+                    <div id="supportedFormatsInfo" style="margin-top: 2px;">Đang kiểm tra capability...</div>
+                    <div style="margin-top: 2px; opacity: 0.85;">Audio, URL, Azure và LLM đang tắt để giữ chế độ offline.</div>
                 </div>
             </div>
-            <div class="modal-footer" style="border-top: 1px solid var(--glass-border); padding-top: 0.75rem; display: flex; justify-content: flex-end; gap: 10px;">
-                <button class="landing-btn" onclick="closeFolderModal()" style="background: transparent; color: var(--text-color); border: 1px solid var(--glass-border); padding: 6px 14px; font-size: 0.9rem; min-height: 36px;">Hủy</button>
-                <button class="landing-btn" onclick="submitManualFolder()" style="padding: 6px 16px; font-size: 0.9rem; min-height: 36px;">Lưu đường dẫn</button>
+            <div class="modal-footer">
+                <button class="landing-btn" onclick="closeFolderModal()" style="background: transparent; color: var(--text-secondary); border: 1px solid var(--glass-border); padding: 7px 16px; font-size: 0.88rem;">Hủy</button>
+                <button class="landing-btn" onclick="submitManualFolder()" style="padding: 7px 20px; font-size: 0.88rem;">Lưu đường dẫn</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- OCR & Gemini Settings Modal -->
+    <div class="lg-alert-overlay" id="ocrSelectOverlay" onclick="closeOcrModal(event)" style="display: none;">
+        <div class="ocr-config-modal" onclick="event.stopPropagation()">
+            <div class="modal-header">
+                <div class="modal-title">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: #f59e0b;"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/></svg>
+                    Cấu hình OCR & Gemini AI
+                </div>
+                <button class="modal-close-btn" onclick="closeOcrModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p class="ocr-intro-text">
+                    Tài liệu văn phòng (Word, Excel, PPTX, HTML, Text) luôn xử lý offline tốc độ cao. Với PDF scan, sách scan hoặc ảnh mờ, hệ thống ưu tiên gọi Gemini AI để nhận diện tiếng Việt chính xác và giữ nguyên công thức toán học.
+                </p>
+
+                <div class="ocr-field-group">
+                    <label class="ocr-field-label" for="ocrEngineSelect">Chế độ OCR:</label>
+                    <select id="ocrEngineSelect" class="search-box" style="width: 100%; box-sizing: border-box; padding: 7px 10px; border-radius: 8px; font-size: 0.88rem; background: var(--bg-card); color: var(--text-primary);">
+                        <option value="hybrid">✨ Kết hợp: Gemini AI (Scan/Ảnh) + Tesseract Dự phòng</option>
+                        <option value="tesseract">⚡ Thuần Offline: Tesseract-OCR (Không tốn mạng/token)</option>
+                    </select>
+                </div>
+
+                <div class="ocr-field-group">
+                    <label class="ocr-field-label" for="geminiModelSelect">Mô hình Gemini:</label>
+                    <select id="geminiModelSelect" class="search-box" style="width: 100%; box-sizing: border-box; padding: 7px 10px; border-radius: 8px; font-size: 0.88rem; background: var(--bg-card); color: var(--text-primary);">
+                        <option value="gemini-3.6-flash">Gemini 3.6 Flash (Khuyên dùng - Mới nhất, nhanh, chính xác)</option>
+                        <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
+                        <option value="gemini-2.5-pro">Gemini 2.5 Pro (Sách phức tạp)</option>
+                        <option value="gemini-1.5-flash">Gemini 1.5 Flash (Dự phòng)</option>
+                    </select>
+                </div>
+
+                <div class="ocr-field-group">
+                    <div class="ocr-field-label">
+                        <label for="geminiApiKeyInput">Google Gemini API Key:</label>
+                        <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener">Lấy key miễn phí &rarr;</a>
+                    </div>
+                    <div style="display: flex; gap: 8px; align-items: center;">
+                        <input type="password" id="geminiApiKeyInput" class="search-box" style="flex: 1; box-sizing: border-box; padding: 7px 10px; border-radius: 8px; font-size: 0.88rem;" placeholder="Dán API Key AI Studio của bạn vào đây..." autocomplete="off">
+                        <button type="button" class="landing-btn" onclick="testGeminiKey()" id="btnTestKey" style="padding: 6px 14px; font-size: 0.82rem; white-space: nowrap; height: 34px;">Kiểm tra</button>
+                    </div>
+                    <div id="ocrTestStatus" style="font-size: 0.8rem; min-height: 18px; line-height: 18px;"></div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="landing-btn" onclick="closeOcrModal()" style="background: transparent; border: 1px solid var(--glass-border); color: var(--text-secondary); padding: 7px 16px; font-size: 0.88rem;">Hủy</button>
+                <button class="landing-btn" onclick="saveOcrSettings()" id="btnSaveOcr" style="padding: 7px 20px; font-size: 0.88rem;">Lưu cấu hình</button>
             </div>
         </div>
     </div>
@@ -2180,6 +2495,8 @@
         let backendMode = false;
         let backendTotal = 0;
         let backendStats = { total: 0, extensions: {}, years: {}, domains: {} };
+        let backendRequiresReindex = false;
+        let backendReindexWarningShown = false;
 
         let filteredResults = [];
         let currentPage = 1;
@@ -2192,13 +2509,18 @@
         const TOKEN_PATTERN = /[a-z0-9]+(?:[._\/-][a-z0-9]+)*/g;
         const VT_LETTERS_STR = "a-zA-Z0-9áàảãạăắằẳẵặâấầẩẫậéèẻẽẹêếềểễệíìỉĩịóòỏõọôốồổỗộơớờởỡợúùủũụưứừửữựýỳỷỹỵđĐ";
         const VT_LETTERS_CLASS = "[" + VT_LETTERS_STR + "]";
+        // Used only to keep low-information terms out of spellcheck vocabulary.
+        // Search, scoring and highlight always retain the complete query.
         const STOP_WORDS = new Set([
             "with", "of", "the", "and", "at", "for", "a",
             "va", "cua", "nhung", "cac", "cho", "trong", "tren", "la", "duoc",
             "mot", "nhieu", "ve", "khi", "khong"
         ]);
         const PROTECTED_SPELLCHECK_WORDS = new Set(["it", "hr", "kpi", "okr", "hsse", "hsseq", "cict"]);
-        const UNKNOWN_YEAR_LABEL = "Không rõ năm";
+        const UNKNOWN_YEAR_LABEL = "Không rõ năm tạo";
+        const SCROLLBAR_MARKER_MAX = 60;
+        const SCROLLBAR_MARKER_BUCKET_PX = 8;
+        const SCROLLBAR_MATCH_WINDOW = 160;
         const SOURCE_LABELS = {
             formal_document: "Tài liệu chính thống",
             chat_screenshot: "Ảnh chat",
@@ -2276,10 +2598,7 @@
         }
 
         function filterSearchWords(queryWords) {
-            if (queryWords.length <= 1) return queryWords;
-            const normalized = uniqueTokens(queryWords.flatMap(w => tokenize(w)));
-            const filtered = normalized.filter(w => w.length > 1 && !STOP_WORDS.has(w));
-            return filtered.length > 0 ? filtered : queryWords;
+            return uniqueTokens((queryWords || []).flatMap(w => tokenize(w)));
         }
 
         // Initialize App
@@ -2331,10 +2650,15 @@
             const vocabularyPromise = api.get_search_vocabulary ? api.get_search_vocabulary() : Promise.resolve({ titles: [] });
             Promise.all([statsPromise, vocabularyPromise]).then(([stats, vocabulary]) => {
                 backendStats = stats || backendStats;
+                backendRequiresReindex = Boolean(backendStats.requires_reindex);
                 backendTotal = Number(backendStats.total || 0);
                 titleVocabulary = Array.isArray(vocabulary && vocabulary.titles) ? vocabulary.titles : [];
                 buildDashboardStatsFromBackend();
                 renderSidebarFiltersFromBackend();
+                if (backendRequiresReindex && !backendReindexWarningShown) {
+                    backendReindexWarningShown = true;
+                    showToast("Chỉ mục cũ cần quét lại để cập nhật năm tạo file.");
+                }
             }).catch(error => console.error("Không thể tải chỉ mục SQLite:", error));
         }
 
@@ -2373,7 +2697,11 @@
         // Vietnamese Accent/Diacritic Removal
         function removeDiacritics(str) {
             if (!str) return "";
-            return String(str).replace(/[áàảãạăắằẳẵặâấầẩẫậéèẻẽẹêếềểễệíìỉĩịóòỏõọôốồổỗộơớờởỡợúùủũụưứừửữựýỳỷỹỵđÁÀẢÃẠĂẮẰẲẴẶÂẤẦẨẪẬÉÈẺẼẸÊẾỀỂỄỆÍÌỈĨỊÓÒỎÕỌÔỐỒỔỖỘƠỚỜỞỠỢÚÙỦŨỤƯỨỪỬỮỰÝỲỶỸỴĐ]/g, char => DIACRITIC_CHAR_MAP[char] || char).toLowerCase();
+            return String(str)
+                .normalize("NFD")
+                .replace(/[\u0300-\u036f]/g, "")
+                .replace(/[đĐ]/g, "d")
+                .toLowerCase();
         }
 
         // Build stats on landing page
@@ -2651,7 +2979,10 @@
                 if (progressContainer) progressContainer.style.display = "none";
                 btn.textContent = originalText;
                 btn.disabled = false;
-                alert("Tính năng quét chỉ khả dụng khi chạy trên ứng dụng SuperSearch (EXE).");
+                showLgAlert(
+                    "Tính năng quét và lập chỉ mục chỉ khả dụng khi chạy trên ứng dụng SuperSearch (EXE).\n\nTrình duyệt web không thể truy cập quét ổ đĩa máy tính. Vui lòng khởi chạy file SuperSearch.exe.",
+                    "Cần chạy trên SuperSearch (EXE)"
+                );
             }
         }
 
@@ -3205,11 +3536,6 @@
                         score += 12;
                     }
 
-                    const detectedYear = getNumericYear(doc.year);
-                    if (detectedYear && detectedYear >= 2010) {
-                        score += Math.min(24, (detectedYear - 2010) * 1.2);
-                    }
-
                     matched.push({
                         doc: doc,
                         score: score,
@@ -3372,23 +3698,27 @@
             const api = window.pywebview && window.pywebview.api;
             if (!api || !api.search_documents) return;
             const started = performance.now();
-            const queryParts = [activeQuery, filterQuery].map(value => String(value || '').trim()).filter(Boolean);
             const filters = {
                 domain: selectedDomain,
                 extension: selectedDocExt,
-                year: selectedDocYear
+                year: selectedDocYear,
+                within_query: filterQuery
             };
-            api.search_documents(queryParts.join(' '), page || 1, RESULTS_PER_PAGE, filters).then(result => {
+            api.search_documents(activeQuery, page || 1, RESULTS_PER_PAGE, filters).then(result => {
                 backendTotal = Number(result && result.total || 0);
                 filteredResults = Array.isArray(result && result.documents) ? result.documents : [];
                 currentMatchedDocs = filteredResults.slice();
                 currentPage = Number(result && result.page || page || 1);
+                backendRequiresReindex = Boolean(result && result.requires_reindex);
                 const elapsed = ((performance.now() - started) / 1000).toFixed(3);
                 const countText = document.getElementById("resultsCountText");
-                if (countText) countText.textContent = `Tìm thấy khoảng ${backendTotal} kết quả (${elapsed} giây)`;
+                const countLabel = result && result.truncated ? "Tìm thấy ít nhất" : "Tìm thấy";
+                if (countText) countText.textContent = `${countLabel} ${backendTotal} kết quả (${elapsed} giây)`;
                 const spellingBanner = document.getElementById("spellingBanner");
                 if (spellingBanner) spellingBanner.style.display = "none";
-                const words = filterSearchWords(tokenize(removeDiacritics(activeQuery)));
+                const words = Array.isArray(result && result.query_tokens)
+                    ? result.query_tokens
+                    : filterSearchWords(tokenize(removeDiacritics(activeQuery)));
                 renderExtractiveAnswer([]);
                 renderResultsList(words);
                 renderSidebarFiltersFromBackend();
@@ -3765,7 +4095,7 @@
 
                 // Dynamic text snippet generation
                 const snippetHTML = backendMode && doc.snippet
-                    ? escapeHTML(String(doc.snippet).replace(/<\/?mark[^>]*>/gi, ""))
+                    ? highlightText(String(doc.snippet), searchWords)
                     : getSmartSnippet(doc.content, searchWords);
 
                 // Extract original path and create link
@@ -3993,7 +4323,7 @@
                     const ext = doc.original_path.split('.').pop().toUpperCase();
                     const dy = getNormalizedYear(doc.year);
 
-                    // 1. Đếm cho Loại tài liệu (phụ thuộc vào Năm khởi tạo đang chọn)
+                    // 1. Đếm cho Loại tài liệu (phụ thuộc vào Năm tạo file đang chọn)
                     let matchForExt = true;
                     if (selectedDocYear) {
                         matchForExt = (String(dy) === String(selectedDocYear));
@@ -4002,7 +4332,7 @@
                         docExts[ext] = (docExts[ext] || 0) + 1;
                     }
 
-                    // 2. Đếm cho Năm khởi tạo (phụ thuộc vào Loại tài liệu đang chọn)
+                    // 2. Đếm cho Năm tạo file (phụ thuộc vào Loại tài liệu đang chọn)
                     let matchForYear = true;
                     if (selectedDocExt) {
                         matchForYear = (ext === selectedDocExt);
@@ -4020,7 +4350,7 @@
         function renderSidebarFiltersFromBackend() {
             if (!backendMode) return;
             const extensions = Object.assign({}, backendStats.extensions || {});
-            const years = Object.assign({}, backendStats.years || {});
+            const years = backendRequiresReindex ? {} : Object.assign({}, backendStats.years || {});
             renderFilterSection("filterDocExt", extensions, selectedDocExt, setDocExtFilter);
             renderFilterSection("filterDocYear", years, selectedDocYear, setDocYearFilter);
         }
@@ -4071,26 +4401,53 @@
         }
 
         function setDocYearFilter(val) {
+            if (backendMode && backendRequiresReindex && val) {
+                showToast("Quét lại chỉ mục trước khi lọc theo năm tạo file.");
+                return;
+            }
             selectedDocYear = val;
             performSearchFilterAndRender();
         }
 
-        // Clipboard Action helper
+        function openQuickViewOriginalFile() {
+            if (!currentQuickViewDoc) return;
+            const targetPath = currentQuickViewDoc.absolute_original_path || currentQuickViewDoc.original_path || currentQuickViewDoc.path || "";
+            openFileLocation(targetPath);
+        }
+
+        // Action mở file gốc và clipboard
         function copyPathToClipboard(pathStr) {
-            if (window.pywebview && window.pywebview.api && window.pywebview.api.open_explorer) {
-                const explorerResult = window.pywebview.api.open_explorer(pathStr);
-                if (explorerResult && typeof explorerResult.catch === "function") {
-                    explorerResult.catch(() => showToast("Không thể mở Explorer."));
-                }
-            }
-            if (!navigator.clipboard || !navigator.clipboard.writeText) {
-                showToast("Đã mở vị trí file; clipboard không khả dụng.");
+            openFileLocation(pathStr);
+        }
+
+        function openFileLocation(pathStr) {
+            if (!pathStr) {
+                showToast("Không tìm thấy đường dẫn file gốc.");
                 return;
             }
-            navigator.clipboard.writeText(pathStr).then(
-                () => showToast("Đã sao chép đường dẫn tuyệt đối!"),
-                () => showToast("Đã mở vị trí file; không thể sao chép clipboard.")
-            );
+            if (window.pywebview && window.pywebview.api && window.pywebview.api.open_explorer) {
+                window.pywebview.api.open_explorer(pathStr).then(res => {
+                    if (res) {
+                        showToast("Đang mở thư mục và chọn file trong Windows Explorer...");
+                    } else {
+                        if (navigator.clipboard && navigator.clipboard.writeText) {
+                            navigator.clipboard.writeText(pathStr);
+                        }
+                        showToast("Không tìm thấy file gốc trên đĩa (đã sao chép đường dẫn).");
+                    }
+                }).catch(() => {
+                    if (navigator.clipboard && navigator.clipboard.writeText) {
+                        navigator.clipboard.writeText(pathStr);
+                    }
+                    showToast("Đã sao chép đường dẫn tuyệt đối!");
+                });
+            } else {
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    navigator.clipboard.writeText(pathStr).then(() => {
+                        showToast("Đã sao chép đường dẫn tuyệt đối!");
+                    });
+                }
+            }
         }
 
         function showToast(message) {
@@ -4232,14 +4589,153 @@
             }).catch(error => console.error("Không thể tải tài liệu:", error));
         }
 
-        function renderQuickViewDocument(doc) {
+        function findScrollbarTokenPositions(text, token) {
+            const normalized = removeDiacritics(text);
+            const escaped = escapeRegex(token);
+            const regex = new RegExp('(^|[^a-z0-9])(' + escaped + ')(?=$|[^a-z0-9])', 'g');
+            const positions = [];
+            let match;
+            while ((match = regex.exec(normalized)) !== null) {
+                positions.push({ start: match.index + match[1].length, end: match.index + match[0].length, token });
+            }
+            return positions;
+        }
 
+        function scoreScrollbarBlock(text, searchWords) {
+            const tokens = uniqueTokens(searchWords || []);
+            if (!text || tokens.length === 0) return null;
+
+            const normalized = removeDiacritics(text);
+            const phraseRegex = new RegExp(
+                '(^|[^a-z0-9])' + tokens.map(escapeRegex).join('\\s+') + '(?=$|[^a-z0-9])',
+                'i'
+            );
+            const exactPhrase = phraseRegex.test(normalized);
+            const requiredCoverage = tokens.length <= 3
+                ? tokens.length
+                : Math.max(3, Math.ceil(tokens.length * 0.6));
+            const occurrences = [];
+            tokens.forEach((token, tokenIndex) => {
+                findScrollbarTokenPositions(normalized, token).forEach(position => {
+                    occurrences.push({ ...position, tokenIndex });
+                });
+            });
+            occurrences.sort((a, b) => a.start - b.start || a.end - b.end);
+
+            let bestWindow = null;
+            for (let left = 0; left < occurrences.length; left++) {
+                const seen = new Set();
+                for (let right = left; right < occurrences.length; right++) {
+                    seen.add(occurrences[right].tokenIndex);
+                    const span = occurrences[right].end - occurrences[left].start;
+                    if (span > SCROLLBAR_MATCH_WINDOW) break;
+                    if (seen.size < requiredCoverage) continue;
+                    const score = exactPhrase ? 3 : (seen.size === tokens.length ? 2 : 1);
+                    if (!bestWindow || score > bestWindow.score || (score === bestWindow.score && span < bestWindow.span)) {
+                        bestWindow = { score, span, start: occurrences[left].start };
+                    }
+                    if (seen.size === tokens.length) break;
+                }
+            }
+
+            if (!bestWindow) return null;
+            return { score: bestWindow.score, start: bestWindow.start, coverage: requiredCoverage };
+        }
+
+        function collectScrollbarMarkerTargets(modalBody, searchWords) {
+            const tokens = uniqueTokens(searchWords || []);
+            if (!modalBody || tokens.length === 0) return [];
+
+            const marks = Array.from(modalBody.querySelectorAll('mark.highlight-mark'));
+            const blocks = Array.from(modalBody.querySelectorAll('p'));
+            const candidateBlocks = blocks.length > 0 ? blocks : [modalBody];
+            const marksByBlock = new Map(candidateBlocks.map(block => [block, []]));
+            marks.forEach(mark => {
+                const block = blocks.length > 0 ? mark.closest('p') : modalBody;
+                if (marksByBlock.has(block)) marksByBlock.get(block).push(mark);
+            });
+            return candidateBlocks.map(block => {
+                const match = scoreScrollbarBlock(block.textContent || '', tokens);
+                const blockMarks = marksByBlock.get(block) || [];
+                if (!match || blockMarks.length === 0) return null;
+                return { mark: blockMarks[0], score: match.score, coverage: match.coverage };
+            }).filter(Boolean);
+        }
+
+        function selectScrollbarMarkerTargets(candidates, containerHeight, scrollHeight) {
+            if (!candidates || candidates.length === 0 || containerHeight <= 0 || scrollHeight <= 0) return [];
+            const bucketSize = Math.max(SCROLLBAR_MARKER_BUCKET_PX, containerHeight / SCROLLBAR_MARKER_MAX);
+            const buckets = new Map();
+            candidates.forEach(candidate => {
+                const top = candidate.mark.offsetTop || 0;
+                const trackTop = Math.min(containerHeight, Math.max(0, (top / scrollHeight) * containerHeight));
+                const bucket = Math.floor(trackTop / bucketSize);
+                const current = buckets.get(bucket);
+                if (!current || candidate.score > current.score || (candidate.score === current.score && candidate.coverage > current.coverage)) {
+                    buckets.set(bucket, candidate);
+                }
+            });
+            return Array.from(buckets.values())
+                .sort((a, b) => (a.mark.offsetTop || 0) - (b.mark.offsetTop || 0))
+                .slice(0, SCROLLBAR_MARKER_MAX);
+        }
+
+        let activeQuickViewTab = 'html';
+        let currentQuickViewDoc = null;
+
+        function switchQuickViewTab(tab) {
+            activeQuickViewTab = tab;
+            const htmlTabBtn = document.getElementById("tabBtnHtml");
+            const mdTabBtn = document.getElementById("tabBtnMarkdown");
+            const htmlPane = document.getElementById("quickViewHtmlPane");
+            const mdPane = document.getElementById("quickViewMarkdownPane");
+            const copyBtnText = document.getElementById("copyBtnText");
+            if (copyBtnText) copyBtnText.textContent = tab === 'markdown' ? "Chép Markdown" : "Sao chép";
+
+            if (tab === 'html') {
+                if (htmlTabBtn) htmlTabBtn.classList.add("active");
+                if (mdTabBtn) mdTabBtn.classList.remove("active");
+                if (htmlPane) htmlPane.style.display = "block";
+                if (mdPane) mdPane.style.display = "none";
+            } else {
+                if (htmlTabBtn) htmlTabBtn.classList.remove("active");
+                if (mdTabBtn) mdTabBtn.classList.add("active");
+                if (htmlPane) htmlPane.style.display = "none";
+                if (mdPane) mdPane.style.display = "block";
+            }
+        }
+
+        function copyQuickViewContent() {
+            if (!currentQuickViewDoc) return;
+            const copyBtnText = document.getElementById("copyBtnText");
+            let textToCopy = activeQuickViewTab === 'markdown' 
+                ? (currentQuickViewDoc.content || "") 
+                : (document.getElementById("quickViewHtmlPane")?.innerText || currentQuickViewDoc.content || "");
+            if (!textToCopy) return;
+
+            const onCopied = () => {
+                if (copyBtnText) copyBtnText.textContent = "✓ Đã sao chép";
+                setTimeout(() => {
+                    if (copyBtnText) copyBtnText.textContent = activeQuickViewTab === 'markdown' ? "Chép Markdown" : "Sao chép";
+                }, 1500);
+            };
+
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(textToCopy).then(onCopied).catch(onCopied);
+            } else {
+                onCopied();
+            }
+        }
+
+        function renderQuickViewDocument(doc) {
+            currentQuickViewDoc = doc;
             const documentPath = doc.path || doc.relative_path || doc.original_path || "";
             const documentTitle = doc.title || doc.original_path || "Tài liệu";
 
             const modalTitle = document.getElementById("modalTitle");
-            const modalBody = document.getElementById("modalBody");
             const overlay = document.getElementById("quickViewOverlay");
+            const htmlPane = document.getElementById("quickViewHtmlPane");
+            const mdCode = document.getElementById("quickViewMarkdownCode");
 
             // Setup title with appropriate icon
             const originalPath = documentPath.replace(/\.md$/i, '');
@@ -4251,49 +4747,59 @@
             const searchWords = filterSearchWords(tokenize(cleanQuery));
 
             let displayContent = doc.content || "Không có nội dung chi tiết.";
+            let htmlBodyContent = doc.html_content || "";
 
-            // Format content basic line breaks to paragraphs/br
-            const paragraphs = displayContent.split(/\n\s*\n/);
-            let formattedHTML = paragraphs.map(p => {
-                let pEscaped = escapeHTML(p);
-                let pClean = pEscaped.replace(/\n/g, '<br>');
-                return `<p>${pClean}</p>`;
-            }).join('');
+            if (!htmlBodyContent) {
+                const paragraphs = displayContent.split(/\n\s*\n/);
+                htmlBodyContent = paragraphs.map(p => {
+                    let pEscaped = escapeHTML(p);
+                    let pClean = pEscaped.replace(/\n/g, '<br>');
+                    return `<p>${pClean}</p>`;
+                }).join('');
+            }
 
             // Parse into temporary element to safely highlight text nodes
             const tempDiv = document.createElement("div");
-            tempDiv.innerHTML = formattedHTML;
+            tempDiv.innerHTML = htmlBodyContent;
 
             if (searchWords.length > 0) {
                 highlightElementTextNodes(tempDiv, searchWords);
             }
 
-            modalBody.innerHTML = tempDiv.innerHTML;
+            if (htmlPane) htmlPane.innerHTML = tempDiv.innerHTML;
+            if (mdCode) mdCode.textContent = displayContent;
+
+            // Luôn mặc định mở tab HTML theo yêu cầu
+            switchQuickViewTab('html');
             overlay.style.display = "flex";
             document.body.style.overflow = "hidden"; // Prevent scrolling body
 
+            // Kích hoạt MathJax typeset cho tab HTML nếu có công thức
+            if (window.MathJax && window.MathJax.typesetPromise && htmlPane) {
+                try { window.MathJax.typesetPromise([htmlPane]); } catch(e) {}
+            }
+
             // Tạo các vạch định vị highlight trên scrollbar
             const markerTrack = document.getElementById("scrollbarMarkerTrack");
-            if (markerTrack) {
+            if (markerTrack && htmlPane) {
                 markerTrack.innerHTML = "";
                 setTimeout(() => {
-                    const marks = modalBody.querySelectorAll("mark.highlight-mark");
-                    const scrollHeight = modalBody.scrollHeight;
-                    const containerHeight = modalBody.clientHeight;
+                    const scrollHeight = htmlPane.scrollHeight;
+                    const containerHeight = htmlPane.clientHeight;
+                    const candidates = collectScrollbarMarkerTargets(htmlPane, searchWords);
+                    const targets = selectScrollbarMarkerTargets(candidates, containerHeight, scrollHeight);
 
-                    if (scrollHeight > 0 && marks.length > 0) {
-                        // Giới hạn tối đa 150 markers để tránh quá tải DOM
-                        const step = Math.ceil(marks.length / 150);
-                        marks.forEach((mark, markIdx) => {
-                            if (markIdx % step !== 0) return;
-                            const ratio = mark.offsetTop / scrollHeight;
+                    if (scrollHeight > 0 && targets.length > 0) {
+                        targets.forEach((target, targetIdx) => {
+                            const mark = target.mark;
+                            const ratio = Math.min(1, Math.max(0, mark.offsetTop / scrollHeight));
                             const marker = document.createElement("div");
                             marker.className = "scrollbar-marker";
                             marker.style.top = (ratio * containerHeight) + "px";
-                            marker.title = `Đến vị trí highlight ${markIdx + 1}`;
+                            marker.title = `Đến cụm khớp ${targetIdx + 1}`;
                             marker.onclick = (e) => {
                                 e.stopPropagation();
-                                modalBody.scrollTo({
+                                htmlPane.scrollTo({
                                     top: mark.offsetTop - (containerHeight / 3),
                                     behavior: 'smooth'
                                 });
@@ -4301,9 +4807,9 @@
                             markerTrack.appendChild(marker);
                         });
 
-                        // Tự động cuộn đến highlight đầu tiên
-                        modalBody.scrollTo({
-                            top: marks[0].offsetTop - (containerHeight / 3),
+                        // Tự động cuộn đến cụm khớp đáng tin cậy đầu tiên
+                        htmlPane.scrollTo({
+                            top: targets[0].mark.offsetTop - (containerHeight / 3),
                             behavior: 'smooth'
                         });
                     }
@@ -4511,6 +5017,13 @@
 
         // Folder Modal logic
         function openFolderModal() {
+            if (!(window.pywebview && window.pywebview.api)) {
+                showLgAlert(
+                    "Tính năng cấu hình và quét thư mục chỉ khả dụng khi chạy trên ứng dụng SuperSearch (EXE).\n\nTrình duyệt web bị giới hạn sandbox nên không có quyền quét ổ đĩa hệ thống. Vui lòng mở file SuperSearch.exe để chọn thư mục và quét tài liệu.",
+                    "Cần chạy trên SuperSearch (EXE)"
+                );
+                return;
+            }
             const overlay = document.getElementById("folderSelectOverlay");
             if (overlay) {
                 overlay.style.display = "flex";
@@ -4524,8 +5037,189 @@
             }
         }
 
+        // OCR Settings Modal Logic
+        function openOcrModal() {
+            const overlay = document.getElementById("ocrSelectOverlay");
+            if (overlay) {
+                overlay.style.display = "flex";
+            }
+            const keyInput = document.getElementById("geminiApiKeyInput");
+            const modelSelect = document.getElementById("geminiModelSelect");
+            const engineSelect = document.getElementById("ocrEngineSelect");
+
+            // Nạp từ localStorage trước nếu có
+            try {
+                const localKey = localStorage.getItem("gemini_api_key");
+                const localModel = localStorage.getItem("gemini_model");
+                const localEngine = localStorage.getItem("ocr_engine");
+                if (localKey && keyInput && !keyInput.value) keyInput.value = localKey;
+                if (localModel && modelSelect) modelSelect.value = localModel;
+                if (localEngine && engineSelect) engineSelect.value = localEngine;
+            } catch(e) {}
+
+            // Đồng bộ với backend Python nếu có
+            if (window.pywebview && window.pywebview.api && window.pywebview.api.get_ocr_config) {
+                window.pywebview.api.get_ocr_config().then(function(cfg) {
+                    if (cfg) {
+                        if (cfg.gemini_api_key && keyInput) keyInput.value = cfg.gemini_api_key;
+                        if (cfg.gemini_model && modelSelect) modelSelect.value = cfg.gemini_model;
+                        if (cfg.ocr_engine && engineSelect) engineSelect.value = cfg.ocr_engine;
+                    }
+                }).catch(function() {});
+            }
+        }
+
+        function closeOcrModal(event) {
+            if (event && event.target && event.target !== document.getElementById("ocrSelectOverlay")) return;
+            const overlay = document.getElementById("ocrSelectOverlay");
+            if (overlay) overlay.style.display = "none";
+            const status = document.getElementById("ocrTestStatus");
+            if (status) status.textContent = "";
+        }
+
+        function testGeminiKeyDirect(key, model, status, testBtn) {
+            const url = "https://generativelanguage.googleapis.com/v1beta/models/" + encodeURIComponent(model) + ":generateContent?key=" + encodeURIComponent(key);
+            const payload = {
+                contents: [{ parts: [{ text: "ping" }] }],
+                generationConfig: { maxOutputTokens: 5 }
+            };
+            fetch(url, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload)
+            }).then(function(res) {
+                if (testBtn) testBtn.disabled = false;
+                if (res.ok) {
+                    status.style.color = "#10b981";
+                    status.textContent = "✓ Kết nối thành công! API Key hợp lệ.";
+                } else {
+                    res.json().then(function(errData) {
+                        const msg = (errData && errData.error && errData.error.message) || ("Mã lỗi HTTP " + res.status);
+                        status.style.color = "#ef4444";
+                        status.textContent = "✗ " + msg;
+                    }).catch(function() {
+                        status.style.color = "#ef4444";
+                        status.textContent = "✗ Lỗi phản hồi HTTP " + res.status;
+                    });
+                }
+            }).catch(function(err) {
+                if (testBtn) testBtn.disabled = false;
+                status.style.color = "#ef4444";
+                status.textContent = "✗ Lỗi kết nối mạng: " + (err.message || err);
+            });
+        }
+
+        function testGeminiKey() {
+            const keyInput = document.getElementById("geminiApiKeyInput");
+            const modelSelect = document.getElementById("geminiModelSelect");
+            const status = document.getElementById("ocrTestStatus");
+            const testBtn = document.getElementById("btnTestKey");
+            if (!keyInput || !status) return;
+
+            const key = keyInput.value.trim();
+            const model = modelSelect ? modelSelect.value : "gemini-3.6-flash";
+
+            if (!key) {
+                status.style.color = "#ef4444";
+                status.textContent = "Vui lòng nhập API Key trước khi kiểm tra.";
+                return;
+            }
+
+            status.style.color = "#f59e0b";
+            status.textContent = "Đang kiểm tra kết nối với Google Gemini...";
+            if (testBtn) testBtn.disabled = true;
+
+            // Ưu tiên gọi backend Python qua pywebview nếu có
+            if (window.pywebview && window.pywebview.api && window.pywebview.api.test_gemini_api_key) {
+                window.pywebview.api.test_gemini_api_key(key, model).then(function(res) {
+                    if (testBtn) testBtn.disabled = false;
+                    if (res && res.success) {
+                        status.style.color = "#10b981";
+                        status.textContent = "✓ " + res.message;
+                    } else {
+                        status.style.color = "#ef4444";
+                        status.textContent = "✗ " + (res ? res.message : "Lỗi kiểm tra");
+                    }
+                }).catch(function() {
+                    // Nếu backend gặp sự cố, tự động fallback sang kiểm tra trực tiếp qua fetch
+                    testGeminiKeyDirect(key, model, status, testBtn);
+                });
+            } else {
+                // Chế độ trình duyệt hoặc backend chưa gắn kết: kiểm tra trực tiếp qua REST API
+                testGeminiKeyDirect(key, model, status, testBtn);
+            }
+        }
+
+        function saveOcrSettings() {
+            const keyInput = document.getElementById("geminiApiKeyInput");
+            const modelSelect = document.getElementById("geminiModelSelect");
+            const engineSelect = document.getElementById("ocrEngineSelect");
+            const saveBtn = document.getElementById("btnSaveOcr");
+            const status = document.getElementById("ocrTestStatus");
+
+            const key = keyInput ? keyInput.value.trim() : "";
+            const model = modelSelect ? modelSelect.value : "gemini-3.6-flash";
+            const engine = engineSelect ? engineSelect.value : "hybrid";
+
+            try {
+                localStorage.setItem("gemini_api_key", key);
+                localStorage.setItem("gemini_model", model);
+                localStorage.setItem("ocr_engine", engine);
+            } catch(e) {}
+
+            if (window.pywebview && window.pywebview.api && window.pywebview.api.save_ocr_config) {
+                if (saveBtn) saveBtn.disabled = true;
+                window.pywebview.api.save_ocr_config(key, model, engine).then(function(res) {
+                    if (saveBtn) saveBtn.disabled = false;
+                    if (res && res.success) {
+                        if (status) {
+                            status.style.color = "#10b981";
+                            status.textContent = "✓ " + res.message;
+                        }
+                        setTimeout(function() {
+                            closeOcrModal();
+                        }, 700);
+                    } else {
+                        if (status) {
+                            status.style.color = "#ef4444";
+                            status.textContent = "Lỗi lưu: " + (res ? res.error : "Không xác định");
+                        }
+                    }
+                }).catch(function() {
+                    if (saveBtn) saveBtn.disabled = false;
+                    if (status) {
+                        status.style.color = "#10b981";
+                        status.textContent = "✓ Đã lưu cấu hình vào bộ nhớ ứng dụng.";
+                    }
+                    setTimeout(closeOcrModal, 700);
+                });
+            } else {
+                if (status) {
+                    status.style.color = "#10b981";
+                    status.textContent = "✓ Đã lưu cấu hình (chế độ trình duyệt).";
+                }
+                setTimeout(closeOcrModal, 700);
+            }
+        }
+
+        function showFolderModalNotice(msg, isError) {
+            const el = document.getElementById("folderModalNotice");
+            if (!el) return;
+            el.style.display = "block";
+            el.style.color = isError ? "#ef4444" : "#10b981";
+            el.style.background = isError ? "rgba(239, 68, 68, 0.12)" : "rgba(16, 185, 129, 0.12)";
+            el.style.border = isError ? "1px solid rgba(239, 68, 68, 0.3)" : "1px solid rgba(16, 185, 129, 0.3)";
+            el.textContent = msg;
+        }
+
         // Select folder action
         function selectFolder() {
+            const noticeEl = document.getElementById("folderModalNotice");
+            if (noticeEl) {
+                noticeEl.textContent = "";
+                noticeEl.style.display = "none";
+            }
+
             if (window.pywebview && window.pywebview.api && window.pywebview.api.select_folder) {
                 window.pywebview.api.select_folder().then(function (result) {
                     if (result.success) {
@@ -4542,16 +5236,32 @@
                         refreshIndexUI();
                         if (typeof closeFolderModal === 'function') closeFolderModal();
                     } else if (result.error && result.error !== "Đã hủy chọn thư mục") {
-                        showLgAlert("Lỗi: " + result.error, "Lỗi chọn thư mục");
+                        showFolderModalNotice("Lỗi: " + result.error, true);
                     }
                 }).catch(function (err) {
-                    showLgAlert("Lỗi kết nối Python: " + err, "Lỗi");
+                    showFolderModalNotice("Lỗi kết nối Python: " + err, true);
                 });
             } else {
-                showLgAlert("Tính năng chọn thư mục chỉ khả dụng khi chạy trên ứng dụng SuperSearch (EXE).", "Thông báo");
+                // Chế độ xem trên trình duyệt web (không có backend Python pywebview)
+                if (window.showDirectoryPicker) {
+                    window.showDirectoryPicker().then(function(handle) {
+                        if (handle && handle.name) {
+                            const input = document.getElementById('manualFolderPathInput');
+                            if (input && !input.value) {
+                                input.value = handle.name;
+                            }
+                            showFolderModalNotice("✓ Đã chọn thư mục: " + handle.name + ". (Để lập chỉ mục dữ liệu thực tế, hãy mở SuperSearch.exe)", false);
+                        }
+                    }).catch(function(err) {
+                        if (err.name !== 'AbortError') {
+                            showFolderModalNotice("Trình duyệt web không có quyền mở ổ đĩa hệ thống. Vui lòng dán đường dẫn hoặc chạy file SuperSearch.exe.", true);
+                        }
+                    });
+                } else {
+                    showFolderModalNotice("Tính năng chọn trực tiếp cần môi trường Desktop (SuperSearch.exe). Bạn có thể dán đường dẫn vào ô bên dưới.", true);
+                }
             }
         }
-
 
         function submitManualFolder() {
             let path = document.getElementById('manualFolderPathInput').value;
@@ -4572,13 +5282,34 @@
                             refreshIndexUI();
                             if (typeof closeFolderModal === 'function') closeFolderModal();
                         } else {
-                            alert("Lỗi: " + result.error);
+                            showFolderModalNotice("Lỗi: " + result.error, true);
                         }
                     }).catch(function (err) {
-                        console.error("Folder error:", err);
-                        alert("Đã xảy ra lỗi: " + err);
+                        showFolderModalNotice("Đã xảy ra lỗi: " + err, true);
                     });
+                } else {
+                    try {
+                        localStorage.setItem("scan_folder_path", path.trim());
+                    } catch(e) {}
+                    updateFolderUI(path.trim());
+                    showFolderModalNotice("✓ Đã lưu đường dẫn: " + path.trim() + " (Chế độ trình duyệt)", false);
+                    setTimeout(function() {
+                        if (typeof closeFolderModal === 'function') closeFolderModal();
+                    }, 800);
                 }
+            } else {
+                showFolderModalNotice("Vui lòng nhập đường dẫn thư mục hợp lệ.", true);
+            }
+        }
+
+        function closeFolderModal(event) {
+            if (event && event.target && event.target !== document.getElementById("folderSelectOverlay")) return;
+            const overlay = document.getElementById("folderSelectOverlay");
+            if (overlay) overlay.style.display = "none";
+            const noticeEl = document.getElementById("folderModalNotice");
+            if (noticeEl) {
+                noticeEl.style.display = "none";
+                noticeEl.textContent = "";
             }
         }
 

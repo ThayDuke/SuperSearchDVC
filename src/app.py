@@ -57,6 +57,27 @@ from markitdown import (
 import unicodedata
 from index_store import IndexStore
 
+try:
+    from gemini_ocr_engine import (
+        ocr_image_bytes,
+        ocr_pdf_page_bytes,
+        test_gemini_connection,
+        DEFAULT_GEMINI_MODEL,
+    )
+except ImportError:
+    ocr_image_bytes = None
+    ocr_pdf_page_bytes = None
+    test_gemini_connection = None
+    DEFAULT_GEMINI_MODEL = "gemini-3.6-flash"
+
+try:
+    from html_builder import build_html_document, markdown_to_html_body
+except ImportError:
+    build_html_document = None
+    markdown_to_html_body = None
+
+
+
 
 LOCAL_CORE_FORMAT_GROUPS = {
     "documents": (
@@ -186,14 +207,37 @@ class LocalOcrPdfConverter(DocumentConverter):
                         self.api._calculate_ocr_quality_score(text) < 0.35
                     )
                     if needs_ocr:
-                        with self.api.ocr_lock:
-                            page_img = page.to_image(resolution=150)
-                            img_bytes = io.BytesIO()
-                            page_img.original.save(img_bytes, format='PNG')
-                            img_bytes.seek(0)
-                            with Image.open(img_bytes) as image:
-                                text = pytesseract.image_to_string(image, lang='vie+eng').strip()
-                        text = f"<!-- PAGE {page_num} (OCR Mode) -->\n\n{text}"
+                        gemini_text = None
+                        if (
+                            ocr_pdf_page_bytes is not None
+                            and getattr(self.api, 'ocr_engine', 'hybrid') in ('hybrid', 'gemini')
+                            and getattr(self.api, 'gemini_api_key', None)
+                        ):
+                            try:
+                                page_img = page.to_image(resolution=150)
+                                img_bytes = io.BytesIO()
+                                page_img.original.save(img_bytes, format='PNG')
+                                gemini_text = ocr_pdf_page_bytes(
+                                    img_bytes.getvalue(),
+                                    page_num=page_num,
+                                    api_key=self.api.gemini_api_key,
+                                    model=self.api.gemini_model,
+                                )
+                            except Exception as g_err:
+                                print(f"[Gemini OCR PDF fallback to Tesseract] Page {page_num}: {g_err}")
+                                gemini_text = None
+
+                        if gemini_text:
+                            text = f"<!-- PAGE {page_num} (Gemini AI OCR Mode) -->\n\n{gemini_text}"
+                        else:
+                            with self.api.ocr_lock:
+                                page_img = page.to_image(resolution=150)
+                                img_bytes = io.BytesIO()
+                                page_img.original.save(img_bytes, format='PNG')
+                                img_bytes.seek(0)
+                                with Image.open(img_bytes) as image:
+                                    text = pytesseract.image_to_string(image, lang='vie+eng').strip()
+                            text = f"<!-- PAGE {page_num} (Tesseract OCR Mode) -->\n\n{text}"
                     if text:
                         pages_text.append(text)
         except Exception as e:
@@ -211,15 +255,46 @@ class LocalOcrImageConverter(DocumentConverter):
         return ext in IMAGE_EXTENSIONS
 
     def convert(self, file_stream, stream_info, **kwargs):
-        configure_tesseract(self.api)
-
         file_stream.seek(0)
-        try:
-            with self.api.ocr_lock:
-                with Image.open(file_stream) as img:
-                    text = pytesseract.image_to_string(img, lang='vie+eng')
-        except Exception as e:
-            text = f"Error during local Image OCR: {str(e)}"
+        img_bytes_raw = file_stream.read()
+        file_stream.seek(0)
+
+        gemini_text = None
+        if (
+            ocr_image_bytes is not None
+            and getattr(self.api, 'ocr_engine', 'hybrid') in ('hybrid', 'gemini')
+            and getattr(self.api, 'gemini_api_key', None)
+        ):
+            try:
+                mime_type = "image/png"
+                ext = (stream_info.extension or "").lower()
+                if ext in ('.jpg', '.jpeg'):
+                    mime_type = "image/jpeg"
+                elif ext == '.bmp':
+                    mime_type = "image/bmp"
+                elif ext in ('.tif', '.tiff'):
+                    mime_type = "image/tiff"
+
+                gemini_text = ocr_image_bytes(
+                    img_bytes_raw,
+                    api_key=self.api.gemini_api_key,
+                    model=self.api.gemini_model,
+                    mime_type=mime_type,
+                )
+            except Exception as g_err:
+                print(f"[Gemini OCR Image fallback to Tesseract]: {g_err}")
+                gemini_text = None
+
+        if gemini_text:
+            text = gemini_text
+        else:
+            configure_tesseract(self.api)
+            try:
+                with self.api.ocr_lock:
+                    with Image.open(file_stream) as img:
+                        text = pytesseract.image_to_string(img, lang='vie+eng')
+            except Exception as e:
+                text = f"Error during local Image OCR: {str(e)}"
             
         return DocumentConverterResult(markdown=text)
 
@@ -440,6 +515,8 @@ class Api:
             self.base_dir_meipass = self.base_dir_exe
         self.runtime_dir = os.path.join(self.base_dir, 'runtime')
         self.runtime_markdown_root = os.path.join(self.runtime_dir, 'MARKDOWN')
+        self.runtime_html_root = os.path.join(self.runtime_dir, 'HTML')
+        os.makedirs(self.runtime_html_root, exist_ok=True)
         self.runtime_search_db = os.path.join(self.runtime_dir, 'search_db.js')
         self.runtime_index_db = os.path.join(self.runtime_dir, 'supersearch.db')
         self.runtime_status_file = os.path.join(self.runtime_dir, 'index_status.json')
@@ -458,6 +535,10 @@ class Api:
         self._pause_event.set()
         self.executor = None
         self.ocr_lock = threading.Lock()
+        self.gemini_api_key = ''
+        self.gemini_model = 'gemini-3.6-flash'
+        self.ocr_engine = 'hybrid'
+        self.load_saved_ocr_config()
 
     def set_window(self, window):
         self._window = window
@@ -511,15 +592,73 @@ class Api:
     def save_saved_folder(self, path):
         try:
             os.makedirs(self.runtime_dir, exist_ok=True)
+            cfg = {}
+            if os.path.exists(self.runtime_config_file):
+                with open(self.runtime_config_file, 'r', encoding='utf-8') as f:
+                    try:
+                        cfg = json.load(f)
+                    except Exception:
+                        cfg = {}
+            cfg['scan_dir'] = path.strip()
             temp_path = self.runtime_config_file + '.tmp'
             with open(temp_path, 'w', encoding='utf-8') as f:
-                json.dump({'scan_dir': path.strip()}, f, ensure_ascii=False, indent=2)
+                json.dump(cfg, f, ensure_ascii=False, indent=2)
             os.replace(temp_path, self.runtime_config_file)
             self.scan_dir = os.path.normpath(path)
             return True
         except Exception as e:
             print(f"Error saving scan_dir: {e}")
             return False
+
+    def load_saved_ocr_config(self):
+        try:
+            if os.path.exists(self.runtime_config_file):
+                with open(self.runtime_config_file, 'r', encoding='utf-8') as f:
+                    cfg = json.load(f)
+                    self.gemini_api_key = str(cfg.get('gemini_api_key') or '').strip()
+                    self.gemini_model = str(cfg.get('gemini_model') or 'gemini-3.6-flash').strip()
+                    self.ocr_engine = str(cfg.get('ocr_engine') or 'hybrid').strip()
+        except Exception as e:
+            print(f"Error loading ocr config: {e}")
+
+    def get_ocr_config(self):
+        return {
+            'gemini_api_key': self.gemini_api_key,
+            'gemini_model': self.gemini_model,
+            'ocr_engine': self.ocr_engine,
+        }
+
+    def save_ocr_config(self, gemini_api_key, gemini_model='gemini-3.6-flash', ocr_engine='hybrid'):
+        try:
+            os.makedirs(self.runtime_dir, exist_ok=True)
+            cfg = {}
+            if os.path.exists(self.runtime_config_file):
+                with open(self.runtime_config_file, 'r', encoding='utf-8') as f:
+                    try:
+                        cfg = json.load(f)
+                    except Exception:
+                        cfg = {}
+            cfg['gemini_api_key'] = (gemini_api_key or '').strip()
+            cfg['gemini_model'] = (gemini_model or 'gemini-3.6-flash').strip()
+            cfg['ocr_engine'] = (ocr_engine or 'hybrid').strip()
+
+            temp_path = self.runtime_config_file + '.tmp'
+            with open(temp_path, 'w', encoding='utf-8') as f:
+                json.dump(cfg, f, ensure_ascii=False, indent=2)
+            os.replace(temp_path, self.runtime_config_file)
+
+            self.gemini_api_key = cfg['gemini_api_key']
+            self.gemini_model = cfg['gemini_model']
+            self.ocr_engine = cfg['ocr_engine']
+            return {'success': True, 'message': 'Đã lưu cấu hình OCR thành công.'}
+        except Exception as e:
+            return {'success': False, 'error': str(e)}
+
+    def test_gemini_api_key(self, gemini_api_key, gemini_model='gemini-3.6-flash'):
+        if test_gemini_connection is None:
+            return {'success': False, 'message': 'Module gemini_ocr_engine chưa được nạp.'}
+        success, msg = test_gemini_connection(gemini_api_key, gemini_model)
+        return {'success': success, 'message': msg}
 
     def _scan_id(self, folder_path):
         normalized = os.path.normcase(os.path.normpath(os.path.abspath(folder_path)))
@@ -657,7 +796,13 @@ class Api:
         return self.index_store.search_documents(query, page, page_size, filters)
 
     def get_document(self, document_id):
-        return self.index_store.get_document(document_id)
+        doc = self.index_store.get_document(document_id)
+        if doc and isinstance(doc, dict):
+            if markdown_to_html_body is not None and doc.get('content'):
+                doc['html_content'] = markdown_to_html_body(doc['content'])
+            else:
+                doc['html_content'] = ''
+        return doc
 
     def get_search_vocabulary(self):
         return self.index_store.vocabulary()
@@ -711,19 +856,26 @@ class Api:
                 print(f"Error evaluating progress JS: {e}")
 
     def open_explorer(self, path):
-        # Chuẩn hóa đường dẫn cho Windows
-        path = os.path.normpath(path)
-        if not self.index_store.is_known_path(path):
+        if not path:
             return False
-        if os.path.exists(path):
-            # Mở Windows Explorer và chọn file
-            subprocess.run(["explorer.exe", "/select,", path], check=False)
+        path_str = str(path).strip()
+        resolved = None
+        if hasattr(self, 'index_store') and hasattr(self.index_store, 'resolve_file_path'):
+            resolved = self.index_store.resolve_file_path(path_str)
+        if not resolved:
+            resolved = os.path.normpath(path_str)
+
+        if os.path.isfile(resolved):
+            # Mở Windows Explorer và chọn file gốc (không có khoảng trắng sau dấu phẩy)
+            subprocess.Popen(f'explorer.exe /select,"{resolved}"')
+            return True
+        elif os.path.isdir(resolved):
+            subprocess.Popen(f'explorer.exe "{resolved}"')
             return True
         else:
-            # Nếu file không tồn tại, thử mở thư mục cha
-            parent = os.path.dirname(path)
-            if os.path.exists(parent):
-                subprocess.run(["explorer.exe", parent], check=False)
+            parent = os.path.dirname(resolved)
+            if parent and os.path.isdir(parent):
+                subprocess.Popen(f'explorer.exe "{parent}"')
                 return True
         return False
 
@@ -984,28 +1136,18 @@ class Api:
             return "Song ngữ (EN/VN)"
         return "Tiếng Việt (VN)"
 
-    def _detect_year(self, content_lower, filename, file_year=None):
-        import datetime
-        max_year = datetime.datetime.now().year + 1
-        year_pattern = rf'\b(19\d{{2}}|20\d{{2}})\b'
-        year_match = re.search(year_pattern, filename)
-        if year_match:
-            year = int(year_match.group(1))
-            if 1900 <= year <= max_year:
-                return year
-
-        first_part = (content_lower or "")[:1000]
-        years = [y for y in re.findall(year_pattern, first_part) if 1900 <= int(y) <= max_year]
-        if not years:
-            if isinstance(file_year, int) and 1900 <= file_year <= max_year:
-                return file_year
-            return "N/A"
-
-        freq = {}
-        for y in years:
-            freq[y] = freq.get(y, 0) + 1
-        sorted_years = sorted(freq.items(), key=lambda x: x[1], reverse=True)
-        return int(sorted_years[0][0])
+    def _get_file_creation_parts(self, path):
+        """Return the source file CreationTime parts without content inference."""
+        try:
+            stat = os.stat(path)
+            birthtime = getattr(stat, "st_birthtime", None)
+            if birthtime is None or birthtime <= 0:
+                return 0, 0
+            import datetime
+            created_at = datetime.datetime.fromtimestamp(birthtime)
+            return created_at.year, created_at.month
+        except (AttributeError, OSError, OverflowError, ValueError, TypeError):
+            return 0, 0
 
     def _source_signature(self, path, include_hash=False):
         try:
@@ -1056,6 +1198,25 @@ class Api:
             return self._source_signature(source_path, include_hash=True).get("sha256") != stored_hash
         except (TypeError, ValueError):
             return True
+
+    def _html_cache_path(self, directory, source_path):
+        normalized = os.path.normcase(os.path.normpath(os.path.abspath(source_path)))
+        identity = hashlib.sha256(normalized.encode('utf-8')).hexdigest()[:16]
+        return os.path.join(directory, f"{os.path.basename(source_path)}.{identity}.html")
+
+    def _write_html(self, path, markdown_content, source_path, scan_target):
+        if build_html_document is None:
+            return
+        try:
+            title = os.path.splitext(os.path.basename(source_path))[0]
+            html_doc = build_html_document(markdown_content, title=title, original_path=source_path)
+            temp_path = f"{path}.tmp-{os.getpid()}-{threading.get_ident()}"
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            with open(temp_path, 'w', encoding='utf-8', newline='\n') as f:
+                f.write(html_doc)
+            os.replace(temp_path, path)
+        except Exception as e:
+            print(f"Warning: Failed to write HTML document {path}: {e}")
 
     def _write_markdown(self, path, content, source_path, scan_target):
         source = self._source_signature(source_path, include_hash=True) or {"size": 0, "mtime_ns": 0, "sha256": ""}
@@ -1150,6 +1311,8 @@ class Api:
         scan_id = self._scan_id(scan_target)
         dest_folder_md_root = os.path.join(app_markdown_root, scan_id)
         os.makedirs(dest_folder_md_root, exist_ok=True)
+        dest_folder_html_root = os.path.join(self.runtime_html_root, scan_id)
+        os.makedirs(dest_folder_html_root, exist_ok=True)
         staging_root = os.path.join(self.runtime_dir, f".staging-{scan_id}-{os.getpid()}")
         if os.path.exists(staging_root):
             shutil.rmtree(staging_root, ignore_errors=True)
@@ -1199,16 +1362,27 @@ class Api:
                         })
                         continue
                     
-                    is_stale = self._markdown_needs_refresh(new_markdown_path, file_path, scan_target)
+                    dest_html_dir = os.path.join(dest_folder_html_root, rel_dir)
+                    os.makedirs(dest_html_dir, exist_ok=True)
+                    new_html_path = self._html_cache_path(dest_html_dir, file_path)
+
+                    is_stale = self._markdown_needs_refresh(new_markdown_path, file_path, scan_target) or not os.path.exists(new_html_path)
                     if is_stale:
                         stage_md_path = os.path.join(
                             staging_root,
                             os.path.relpath(new_markdown_path, dest_folder_md_root),
                         )
+                        stage_html_path = os.path.join(
+                            staging_root,
+                            "HTML",
+                            os.path.relpath(new_html_path, dest_folder_html_root),
+                        )
                         tasks.append({
                             'src_path': file_path,
                             'dest_md_path': new_markdown_path,
                             'stage_md_path': stage_md_path,
+                            'dest_html_path': new_html_path,
+                            'stage_html_path': stage_html_path,
                             'scan_target': scan_target
                         })
 
@@ -1284,6 +1458,8 @@ class Api:
                 if not converted_text:
                     raise ConversionPolicyError("conversion_failed", "Bộ chuyển đổi không tạo được nội dung.")
                 self._write_markdown(stage_md_path, converted_text, src_path, task_scan_target)
+                if task.get('stage_html_path'):
+                    self._write_html(task['stage_html_path'], converted_text, src_path, task_scan_target)
                 success = True
             except Exception as e:
                 print(f"Error converting task {src_path}: {e}")
@@ -1346,6 +1522,10 @@ class Api:
             if os.path.exists(stage_path):
                 os.makedirs(os.path.dirname(task['dest_md_path']), exist_ok=True)
                 os.replace(stage_path, task['dest_md_path'])
+            stage_html = task.get('stage_html_path')
+            if stage_html and os.path.exists(stage_html):
+                os.makedirs(os.path.dirname(task['dest_html_path']), exist_ok=True)
+                os.replace(stage_html, task['dest_html_path'])
         shutil.rmtree(staging_root, ignore_errors=True)
 
         # Ghi nhận file mồ côi; chỉ xóa sau khi index mới commit thành công.
@@ -1418,22 +1598,12 @@ class Api:
                             else:
                                 absolute_original_path = cand_base
                         
-                        file_year = 0
-                        file_month = 0
-                        try:
-                            if os.path.exists(absolute_original_path):
-                                import datetime
-                                mtime = os.path.getmtime(absolute_original_path)
-                                dt = datetime.datetime.fromtimestamp(mtime)
-                                file_year = dt.year
-                                file_month = dt.month
-                        except Exception:
-                            pass
+                        file_year, file_month = self._get_file_creation_parts(absolute_original_path)
 
                         title_clean = remove_diacritics(original_filename)
                         content_clean = remove_diacritics(cleaned_content)
                         word_count = len(cleaned_content.split()) if cleaned_content else 1
-                        year = self._detect_year(cleaned_lower, original_filename, file_year)
+                        year = str(file_year) if file_year else "N/A"
                         ocr_quality_score = self._calculate_ocr_quality_score(cleaned_content)
                         source_type = self._classify_source(original_filename, rel_path, cleaned_content, ocr_quality_score)
                         source_signature = self._source_signature(absolute_original_path)
@@ -1471,8 +1641,7 @@ class Api:
             def entry_quality(entry):
                 quality = float(entry.get("ocr_quality_score") or 0)
                 words = int(entry.get("wordCount") or 0)
-                file_year = int(entry.get("file_year") or 0)
-                return (quality, words, file_year)
+                return (quality, words)
 
             for entry in db_entries:
                 original_key = os.path.normcase(os.path.normpath(os.path.abspath(entry.get("absolute_original_path", ""))))

@@ -624,6 +624,8 @@
                     <li><strong>Phân vùng an toàn:</strong> Mỗi thư mục nguồn có một <code>scan_id</code> lấy từ đường dẫn chuẩn hóa, tránh xung đột basename.</li>
                     <li><strong>Dữ liệu runtime:</strong> Cơ sở dữ liệu, cache Markdown và cấu hình nằm trong thư mục <code>runtime/</code> cạnh ứng dụng; không ghi vào thư mục tài liệu nguồn.</li>
                     <li><strong>Tra cứu:</strong> Giao diện desktop truy vấn SQLite qua API Python, chỉ tải nội dung đầy đủ khi mở Quick View.</li>
+                    <li><strong>Xếp hạng:</strong> Giữ toàn bộ token truy vấn, kết hợp BM25 với phrase và proximity; từ phổ biến được giảm trọng số tự nhiên, không bị xóa khỏi highlight.</li>
+                    <li><strong>Highlight:</strong> Snippet giữ dấu tiếng Việt và dùng cùng token với title cùng Quick View.</li>
                 </ul>
 
                 <h2 class="block-title">4. Bộ Phân Loại Tài Liệu Tự Động (AI-Heuristics Classifier)</h2>
@@ -654,9 +656,9 @@
                                 <td>Quy chế / Chính sách, Quy trình / Hướng dẫn, Quyết định / Biên bản.</td>
                             </tr>
                             <tr>
-                                <td><span class="table-tag">Ngôn ngữ & Năm</span></td>
-                                <td>Nhận diện phân phối nguyên âm có dấu Việt Nam và từ nối tiếng Anh. Dùng Regex trích xuất các mốc năm hợp lệ trong khoảng 1900 đến năm hiện tại + 1.</td>
-                                <td>Tiếng Việt (VN), Tiếng Anh (EN), Song ngữ | Năm 2024, 2026...</td>
+                                <td><span class="table-tag">Ngôn ngữ & Năm tạo file</span></td>
+                                <td>Nhận diện ngôn ngữ từ nội dung. Năm tạo file lấy từ CreationTime của file nguồn trên filesystem hiện tại; không suy đoán từ tên hoặc nội dung.</td>
+                                <td>Tiếng Việt (VN), Tiếng Anh (EN), Song ngữ | Năm tạo 2024, 2026</td>
                             </tr>
                         </tbody>
                     </table>

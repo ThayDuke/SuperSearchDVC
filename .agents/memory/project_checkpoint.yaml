@@ -1,0 +1,23 @@
+project: SuperSearchDVC
+task: supersearch-search-remaster
+status: completed
+updated: 2026-09-01
+plan: DOCS/Planning/planning_supersearch_search_remaster.md
+source_files:
+  - src/index_store.py
+  - src/app.py
+  - data/SuperSearch.html
+  - tests/test_search_remaster.py
+  - readme.txt
+  - Readme.html
+verification:
+  unittest: "15/15 PASS"
+  py_compile: PASS
+  javascript_syntax: PASS
+  wsr_audit: "100/100 PASS"
+  git_diff_check: PASS
+artifacts:
+  exe: build_artifacts/SuperSearch.exe
+  portable: SuperSearch_Portable.zip
+reindex_required: true
+reindex_note: "Existing runtime indexes must be rescanned to populate CreationTime-based year semantics."

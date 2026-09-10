@@ -8,6 +8,8 @@ APP_NAME = "SuperSearch.exe"
 BUILD_INPUTS = (
     "app.py",
     "index_store.py",
+    "gemini_ocr_engine.py",
+    "html_builder.py",
     "SuperSearch.spec",
     "LogoSS256.ico",
 )
