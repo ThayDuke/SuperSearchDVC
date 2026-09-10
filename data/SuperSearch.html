@@ -4,11 +4,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SuperSearch - Tra cứu tài liệu siêu tốc CICT</title>
+    <title>SuperSearch - Tra cứu tài liệu siêu tốc</title>
     <link rel="icon" type="image/x-icon" href="LogoSS32.ico">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@700;800&display=swap" rel="stylesheet">
     <style>
         :root {
             /* Pearl Light Theme (Mặc định) */
@@ -22,8 +19,8 @@
             --accent-blue: #3b82f6;
             --accent-purple: #8b5cf6;
             --accent-pink: #ec4899;
-            --font-label: "Be Vietnam Pro", "Segoe UI", Arial, sans-serif;
-            --font-sans: "Segoe UI", Arial, sans-serif;
+            --font-label: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
             --font-mono: Consolas, "Courier New", monospace;
             --radius-outer: 24px;
             --radius-inner: 18px;
@@ -1744,10 +1741,17 @@
         .progress-bar-fill {
             height: 100%;
             width: 0%;
-            background: linear-gradient(90deg, var(--accent-blue), var(--accent-purple), var(--accent-pink));
+            background: linear-gradient(90deg, var(--accent-blue), var(--accent-purple), var(--accent-pink), var(--accent-blue));
+            background-size: 200% 100%;
             box-shadow: 0 0 12px rgba(59, 130, 246, 0.4);
             border-radius: 6px;
             transition: width 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+            animation: progressShimmer 2.5s linear infinite;
+        }
+
+        @keyframes progressShimmer {
+            0% { background-position: 100% 0; }
+            100% { background-position: -100% 0; }
         }
 
         .progress-info {
@@ -1901,6 +1905,12 @@
         .active-file-status.pending {
             color: var(--text-secondary);
             background: rgba(156, 163, 175, 0.15);
+        }
+
+        .active-file-status.subprogress {
+            color: #c084fc;
+            background: rgba(192, 132, 252, 0.18);
+            border: 1px solid rgba(192, 132, 252, 0.35);
         }
 
         /* Liquid Glass Folder Selection Styles */
@@ -2160,7 +2170,6 @@
             }
         };
     </script>
-    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
 </head>
 
 <body data-theme="light">
@@ -2450,9 +2459,9 @@
                     <label class="ocr-field-label" for="geminiModelSelect">Mô hình Gemini:</label>
                     <select id="geminiModelSelect" class="search-box" style="width: 100%; box-sizing: border-box; padding: 7px 10px; border-radius: 8px; font-size: 0.88rem; background: var(--bg-card); color: var(--text-primary);">
                         <option value="gemini-3.6-flash">Gemini 3.6 Flash (Khuyên dùng - Mới nhất, nhanh, chính xác)</option>
-                        <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
-                        <option value="gemini-2.5-pro">Gemini 2.5 Pro (Sách phức tạp)</option>
-                        <option value="gemini-1.5-flash">Gemini 1.5 Flash (Dự phòng)</option>
+                        <option value="gemini-2.5-pro">Gemini 2.5 Pro (Tài liệu phức tạp)</option>
+                        <option value="gemini-2.0-flash">Gemini 2.0 Flash</option>
+                        <option value="gemini-1.5-flash">Gemini 1.5 Flash (Tiết kiệm)</option>
                     </select>
                 </div>
 
@@ -3039,7 +3048,9 @@
             activeFiles.forEach((fileObj, index) => {
                 const file = typeof fileObj === 'string' ? fileObj : fileObj.filename;
                 const fileId = typeof fileObj === 'string' ? fileObj : (fileObj.id || file);
-                const status = typeof fileObj === 'string' ? "Working" : fileObj.status; // "Working" hoặc "Pending"
+                const status = typeof fileObj === 'string' ? "Working" : fileObj.status; // "Working", "Pending" hoặc "Trang 3/15"
+                const lowerStatus = (status || "").toLowerCase();
+                const statusClass = (lowerStatus.includes("trang") || lowerStatus.includes("ocr") || lowerStatus.includes("/")) ? "subprogress" : lowerStatus.replace(/[^a-z0-9]/g, '');
 
                 let item = listContainer.querySelector(`.active-file-item[data-id="${CSS.escape(fileId)}"]`);
                 if (!item) {
@@ -3049,8 +3060,8 @@
                     item.setAttribute("data-id", fileId);
                     const safeFile = escapeHTML(file);
                     item.innerHTML = `
-                        <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 80%;" title="${safeFile}">${safeFile}</span>
-                        <span class="active-file-status ${status.toLowerCase()}">${status}</span>
+                        <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 75%;" title="${safeFile}">${safeFile}</span>
+                        <span class="active-file-status ${statusClass}">${escapeHTML(status)}</span>
                     `;
                     listContainer.appendChild(item);
                     
@@ -3063,7 +3074,7 @@
                     // Cập nhật trạng thái tag
                     const statusSpan = item.querySelector(".active-file-status");
                     if (statusSpan && statusSpan.textContent !== status) {
-                        statusSpan.className = `active-file-status ${status.toLowerCase()}`;
+                        statusSpan.className = `active-file-status ${statusClass}`;
                         statusSpan.textContent = status;
                     }
                 }

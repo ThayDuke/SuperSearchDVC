@@ -138,6 +138,7 @@ def ocr_pdf_page_bytes(
     page_num: int,
     api_key: str,
     model: str = DEFAULT_GEMINI_MODEL,
+    mime_type: str = "image/jpeg",
 ) -> str:
     """Performs OCR on a rendered PDF page image using Gemini API."""
     prompt = f"Trích xuất văn bản từ trang {page_num} của tài liệu scan sang Markdown. Bảo tồn công thức toán và bảng biểu."
@@ -145,7 +146,7 @@ def ocr_pdf_page_bytes(
         page_img_bytes,
         api_key=api_key,
         model=model,
-        mime_type="image/png",
+        mime_type=mime_type,
         custom_prompt=prompt,
     )
 

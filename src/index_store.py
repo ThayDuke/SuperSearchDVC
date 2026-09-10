@@ -178,11 +178,30 @@ class IndexStore:
                 CREATE INDEX IF NOT EXISTS idx_documents_language ON documents(language);
                 CREATE INDEX IF NOT EXISTS idx_documents_year ON documents(year);
                 CREATE INDEX IF NOT EXISTS idx_documents_source_path ON documents(absolute_original_path);
+
+                CREATE TRIGGER IF NOT EXISTS documents_ai AFTER INSERT ON documents BEGIN
+                  INSERT INTO documents_fts(rowid, title_clean, content_clean) VALUES (new.rowid, new.title_clean, new.content_clean);
+                END;
+                CREATE TRIGGER IF NOT EXISTS documents_ad AFTER DELETE ON documents BEGIN
+                  INSERT INTO documents_fts(documents_fts, rowid, title_clean, content_clean) VALUES('delete', old.rowid, old.title_clean, old.content_clean);
+                END;
+                CREATE TRIGGER IF NOT EXISTS documents_au AFTER UPDATE ON documents BEGIN
+                  INSERT INTO documents_fts(documents_fts, rowid, title_clean, content_clean) VALUES('delete', old.rowid, old.title_clean, old.content_clean);
+                  INSERT INTO documents_fts(rowid, title_clean, content_clean) VALUES (new.rowid, new.title_clean, new.content_clean);
+                END;
                 """
             )
             try:
                 connection.execute("ALTER TABLE documents ADD COLUMN source_sha256 TEXT")
             except sqlite3.OperationalError:
+                pass
+            try:
+                doc_count = connection.execute("SELECT COUNT(*) FROM documents").fetchone()[0]
+                if doc_count > 0:
+                    fts_count = connection.execute("SELECT COUNT(*) FROM documents_fts").fetchone()[0]
+                    if fts_count == 0:
+                        connection.execute("INSERT INTO documents_fts(documents_fts) VALUES ('rebuild')")
+            except Exception:
                 pass
 
     @staticmethod
@@ -190,10 +209,107 @@ class IndexStore:
         identity = f"{entry.get('scan_id', '')}\0{entry.get('path', '')}"
         return hashlib.sha256(identity.encode('utf-8', errors='ignore')).hexdigest()
 
+    def sync_entries(self, entries, scan_id=None):
+        """Incrementally synchronize documents without wiping the whole database."""
+        with self._lock, self._connection() as connection:
+            target_scan_ids = set()
+            if scan_id:
+                target_scan_ids.add(scan_id)
+            for entry in entries:
+                sid = entry.get('scan_id') or 'legacy'
+                target_scan_ids.add(sid)
+
+            existing = {}
+            for sid in target_scan_ids:
+                rows = connection.execute(
+                    "SELECT document_id, source_size, source_mtime_ns, source_sha256 FROM documents WHERE scan_id = ?",
+                    (sid,)
+                ).fetchall()
+                for r in rows:
+                    existing[r["document_id"]] = {
+                        "source_size": r["source_size"],
+                        "source_mtime_ns": r["source_mtime_ns"],
+                        "source_sha256": r["source_sha256"],
+                    }
+
+            new_ids = set()
+            for entry in entries:
+                doc_id = self._document_id(entry)
+                new_ids.add(doc_id)
+                old_meta = existing.get(doc_id)
+
+                is_new = old_meta is None
+                is_changed = False
+                if not is_new:
+                    if (
+                        old_meta.get("source_mtime_ns") != entry.get("source_mtime_ns")
+                        or old_meta.get("source_size") != entry.get("source_size")
+                        or (entry.get("source_sha256") and old_meta.get("source_sha256") != entry.get("source_sha256"))
+                    ):
+                        is_changed = True
+
+                if is_new or is_changed:
+                    values = (
+                        doc_id, entry.get('scan_id') or 'legacy',
+                        entry.get('title') or '', entry.get('title_clean') or '',
+                        entry.get('path') or '', entry.get('original_path') or '',
+                        entry.get('absolute_original_path') or '', entry.get('domain') or '',
+                        entry.get('doc_type') or '', entry.get('language') or '',
+                        str(entry.get('year') or 'N/A'), int(entry.get('file_year') or 0),
+                        int(entry.get('file_month') or 0), entry.get('source_type') or '',
+                        float(entry.get('ocr_quality_score') or 0), int(entry.get('wordCount') or 0),
+                        entry.get('source_size'), entry.get('source_mtime_ns'),
+                        entry.get('source_sha256'),
+                        entry.get('content') or '', entry.get('content_clean') or '',
+                    )
+                    connection.execute(
+                        """INSERT INTO documents (
+                            document_id, scan_id, title, title_clean, relative_path,
+                            original_path, absolute_original_path, domain, doc_type,
+                            language, year, file_year, file_month, source_type,
+                            ocr_quality_score, word_count, source_size, source_mtime_ns,
+                            source_sha256, content, content_clean
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        ON CONFLICT(document_id) DO UPDATE SET
+                            title = excluded.title,
+                            title_clean = excluded.title_clean,
+                            relative_path = excluded.relative_path,
+                            original_path = excluded.original_path,
+                            absolute_original_path = excluded.absolute_original_path,
+                            domain = excluded.domain,
+                            doc_type = excluded.doc_type,
+                            language = excluded.language,
+                            year = excluded.year,
+                            file_year = excluded.file_year,
+                            file_month = excluded.file_month,
+                            source_type = excluded.source_type,
+                            ocr_quality_score = excluded.ocr_quality_score,
+                            word_count = excluded.word_count,
+                            source_size = excluded.source_size,
+                            source_mtime_ns = excluded.source_mtime_ns,
+                            source_sha256 = excluded.source_sha256,
+                            content = excluded.content,
+                            content_clean = excluded.content_clean
+                        """,
+                        values,
+                    )
+
+            deleted_ids = [doc_id for doc_id in existing if doc_id not in new_ids]
+            if deleted_ids:
+                for chunk_start in range(0, len(deleted_ids), 500):
+                    chunk = deleted_ids[chunk_start:chunk_start + 500]
+                    placeholders = ",".join("?" for _ in chunk)
+                    connection.execute(f"DELETE FROM documents WHERE document_id IN ({placeholders})", chunk)
+
+            connection.execute(
+                "INSERT INTO index_metadata(key, value) VALUES('semantics_version', ?) "
+                "ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+                (INDEX_SEMANTICS_VERSION,),
+            )
+
     def replace_entries(self, entries):
         """Replace the complete logical index in one transaction."""
         with self._lock, self._connection() as connection:
-            connection.execute("DELETE FROM documents_fts")
             connection.execute("DELETE FROM documents")
             for entry in entries:
                 values = (
@@ -219,7 +335,6 @@ class IndexStore:
                     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                     values,
                 )
-            connection.execute("INSERT INTO documents_fts(documents_fts) VALUES ('rebuild')")
             connection.execute(
                 "INSERT INTO index_metadata(key, value) VALUES('semantics_version', ?) "
                 "ON CONFLICT(key) DO UPDATE SET value = excluded.value",

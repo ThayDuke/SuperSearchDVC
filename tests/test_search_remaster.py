@@ -1,5 +1,4 @@
 import os
-import sqlite3
 import sys
 import tempfile
 import unittest
@@ -156,6 +155,33 @@ class SearchRemasterTests(unittest.TestCase):
 
         self.assertEqual((year, month), (0, 0))
 
+    def test_sync_entries_incremental_and_delete(self):
+        store = self.make_store()
+        doc1 = entry("scan1", "file1.txt", "Tài liệu 1", "nội dung tìm kiếm ban đầu", year="2025")
+        doc1["source_mtime_ns"] = 100
+        doc2 = entry("scan1", "file2.txt", "Tài liệu 2", "thông tin độc lập khác", year="2025")
+        doc2["source_mtime_ns"] = 200
+
+        # Bước 1: Đồng bộ lần đầu (2 documents)
+        store.sync_entries([doc1, doc2], scan_id="scan1")
+        self.assertEqual(store.count_documents(), 2)
+        self.assertEqual(store.search_documents("ban đầu")["total"], 1)
+
+        # Bước 2: Sửa doc1, giữ nguyên doc2
+        doc1_updated = entry("scan1", "file1.txt", "Tài liệu 1", "nội dung đã được cập nhật mới", year="2025")
+        doc1_updated["source_mtime_ns"] = 150
+        store.sync_entries([doc1_updated, doc2], scan_id="scan1")
+        self.assertEqual(store.count_documents(), 2)
+        self.assertEqual(store.search_documents("ban đầu")["total"], 0)
+        self.assertEqual(store.search_documents("cập nhật mới")["total"], 1)
+
+        # Bước 3: Xóa doc2 (chỉ gửi doc1_updated)
+        store.sync_entries([doc1_updated], scan_id="scan1")
+        self.assertEqual(store.count_documents(), 1)
+        self.assertEqual(store.search_documents("độc lập")["total"], 0)
+        self.assertEqual(store.search_documents("cập nhật mới")["total"], 1)
+
 
 if __name__ == "__main__":
     unittest.main()
+

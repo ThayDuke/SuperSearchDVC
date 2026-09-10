@@ -28,6 +28,8 @@ import json
 import shutil
 import ctypes
 import threading
+import time
+import gc
 from concurrent.futures import ThreadPoolExecutor
 
 # Import pandas tslibs first to work around circular import of C APIs in frozen environment
@@ -127,6 +129,88 @@ class ConversionPolicyError(RuntimeError):
         super().__init__(message)
         self.code = code
 
+
+class DynamicWorkerRegulator:
+    """Adaptive resource regulator capping system RAM/CPU below 75% safety ceiling.
+
+    Dynamically meters active concurrent workers without choking to a single thread.
+    - Green Zone (< 65% RAM): 100% capacity (up to max_workers).
+    - Yellow Zone (65% - 75% RAM): Soft-throttle to ~65% capacity.
+    - Red Zone (> 75% RAM): Throttle to floor of 2 workers, force gc.collect(), pace tasks.
+    - Emergency (> 88% RAM): Hard protection at 1 worker with gc.collect().
+    - Hysteresis: Recovers back to higher tiers only after RAM drops below 60% across 2 checks.
+    """
+    def __init__(self, get_ram_fn, base_workers=None):
+        self.get_ram_fn = get_ram_fn
+        cpu_cores = os.cpu_count() or 4
+        self.max_workers = base_workers or max(2, int(cpu_cores * 0.75))
+        self.current_allowed = self.max_workers
+        self.low_ram_streak = 0
+        self.active_count = 0
+        self.lock = threading.RLock()
+        self.cv = threading.Condition(self.lock)
+        self.last_check_time = 0.0
+        self.cached_ram = 50
+
+    def sample_ram(self, force=False):
+        now = time.time()
+        if force or (now - self.last_check_time) >= 0.8:
+            try:
+                self.cached_ram = self.get_ram_fn()
+            except Exception:
+                self.cached_ram = 50
+            self.last_check_time = now
+        return self.cached_ram
+
+    def update_limits(self):
+        ram = self.sample_ram()
+        with self.cv:
+            if ram > 88:
+                self.current_allowed = 1
+                self.low_ram_streak = 0
+                try:
+                    gc.collect()
+                except Exception:
+                    pass
+            elif ram > 75:
+                # Cap 75% reached: soft throttle to at least 2 workers
+                self.current_allowed = max(2, int(self.max_workers * 0.35))
+                self.low_ram_streak = 0
+                try:
+                    gc.collect()
+                except Exception:
+                    pass
+            elif ram >= 65:
+                # Warning zone: 65% - 75%
+                self.current_allowed = max(2, int(self.max_workers * 0.65))
+                self.low_ram_streak = 0
+            else:
+                # Normal zone: < 65%
+                if ram < 60:
+                    self.low_ram_streak += 1
+                if self.low_ram_streak >= 2 or self.current_allowed == self.max_workers:
+                    self.current_allowed = self.max_workers
+            self.cv.notify_all()
+
+    def acquire(self, abort_check=None):
+        with self.cv:
+            while True:
+                if abort_check and abort_check():
+                    return False
+                self.update_limits()
+                if self.active_count < self.current_allowed:
+                    self.active_count += 1
+                    if self.cached_ram > 75:
+                        time.sleep(0.15)
+                    return True
+                self.cv.wait(timeout=0.3)
+
+    def release(self):
+        with self.cv:
+            self.active_count = max(0, self.active_count - 1)
+            self.cv.notify_all()
+
+
 def remove_diacritics(text):
     if not text:
         return ""
@@ -193,6 +277,7 @@ class LocalOcrPdfConverter(DocumentConverter):
         pages_text = []
         try:
             with pdfplumber.open(pdf_source) as pdf:
+                total_pages = len(pdf.pages)
                 for page_num, page in enumerate(pdf.pages, 1):
                     if self.api._scan_aborted:
                         break
@@ -201,6 +286,13 @@ class LocalOcrPdfConverter(DocumentConverter):
                         if self.api._scan_aborted:
                             break
 
+                    if pdf_target and hasattr(self.api, 'update_task_subprogress'):
+                        self.api.update_task_subprogress(
+                            pdf_target,
+                            fraction=(page_num - 1) / max(1, total_pages),
+                            status_text=f"Trang {page_num}/{total_pages}",
+                        )
+
                     text = (page.extract_text() or '').strip()
                     needs_ocr = (
                         len(text) < 100 or
@@ -208,6 +300,7 @@ class LocalOcrPdfConverter(DocumentConverter):
                     )
                     if needs_ocr:
                         gemini_text = None
+                        rendered_img_bytes = None
                         if (
                             ocr_pdf_page_bytes is not None
                             and getattr(self.api, 'ocr_engine', 'hybrid') in ('hybrid', 'gemini')
@@ -216,12 +309,17 @@ class LocalOcrPdfConverter(DocumentConverter):
                             try:
                                 page_img = page.to_image(resolution=150)
                                 img_bytes = io.BytesIO()
-                                page_img.original.save(img_bytes, format='PNG')
+                                rgb_img = page_img.original
+                                if rgb_img.mode in ("RGBA", "P", "LA"):
+                                    rgb_img = rgb_img.convert("RGB")
+                                rgb_img.save(img_bytes, format='JPEG', quality=85)
+                                rendered_img_bytes = img_bytes.getvalue()
                                 gemini_text = ocr_pdf_page_bytes(
-                                    img_bytes.getvalue(),
+                                    rendered_img_bytes,
                                     page_num=page_num,
                                     api_key=self.api.gemini_api_key,
                                     model=self.api.gemini_model,
+                                    mime_type="image/jpeg",
                                 )
                             except Exception as g_err:
                                 print(f"[Gemini OCR PDF fallback to Tesseract] Page {page_num}: {g_err}")
@@ -231,15 +329,25 @@ class LocalOcrPdfConverter(DocumentConverter):
                             text = f"<!-- PAGE {page_num} (Gemini AI OCR Mode) -->\n\n{gemini_text}"
                         else:
                             with self.api.ocr_lock:
-                                page_img = page.to_image(resolution=150)
-                                img_bytes = io.BytesIO()
-                                page_img.original.save(img_bytes, format='PNG')
-                                img_bytes.seek(0)
-                                with Image.open(img_bytes) as image:
+                                if rendered_img_bytes is None:
+                                    page_img = page.to_image(resolution=150)
+                                    img_bytes = io.BytesIO()
+                                    rgb_img = page_img.original
+                                    if rgb_img.mode in ("RGBA", "P", "LA"):
+                                        rgb_img = rgb_img.convert("RGB")
+                                    rgb_img.save(img_bytes, format='JPEG', quality=85)
+                                    rendered_img_bytes = img_bytes.getvalue()
+                                with Image.open(io.BytesIO(rendered_img_bytes)) as image:
                                     text = pytesseract.image_to_string(image, lang='vie+eng').strip()
                             text = f"<!-- PAGE {page_num} (Tesseract OCR Mode) -->\n\n{text}"
                     if text:
                         pages_text.append(text)
+                    if pdf_target and hasattr(self.api, 'update_task_subprogress'):
+                        self.api.update_task_subprogress(
+                            pdf_target,
+                            fraction=page_num / max(1, total_pages),
+                            status_text=f"Trang {page_num}/{total_pages}",
+                        )
         except Exception as e:
             return DocumentConverterResult(markdown=f"Error during local OCR: {str(e)}")
 
@@ -534,11 +642,15 @@ class Api:
         self._pause_event = threading.Event()
         self._pause_event.set()
         self.executor = None
-        self.ocr_lock = threading.Lock()
+        self.ocr_lock = threading.BoundedSemaphore(2)
         self.gemini_api_key = ''
         self.gemini_model = 'gemini-3.6-flash'
         self.ocr_engine = 'hybrid'
         self.load_saved_ocr_config()
+        self._task_weights = {}
+        self._task_subprogress = {}
+        self._completed_weights = 0.0
+        self._last_progress_report_time = 0.0
 
     def set_window(self, window):
         self._window = window
@@ -784,10 +896,14 @@ class Api:
     def get_safe_workers_count(self):
         try:
             cpu_cores = os.cpu_count() or 4
-            max_cpu_workers = max(1, int(cpu_cores * 0.7))
+            max_cpu_workers = max(2, int(cpu_cores * 0.75))
             ram_load = self.get_system_ram_load()
-            if ram_load > 70:
+            if ram_load > 88:
                 return 1
+            if ram_load > 75:
+                return max(2, int(max_cpu_workers * 0.35))
+            if ram_load >= 65:
+                return max(2, int(max_cpu_workers * 0.65))
             return max_cpu_workers
         except Exception:
             return 2 # fallback
@@ -855,6 +971,37 @@ class Api:
             except Exception as e:
                 print(f"Error evaluating progress JS: {e}")
 
+    def _recalculate_and_report_progress(self):
+        """Calculates weighted progress based on bytes, completed tasks, and active subprogress."""
+        if not getattr(self, '_task_weights', None):
+            return
+        active_sub_sum = sum(
+            self._task_weights.get(tid, 0.0) * self._task_subprogress.get(tid, 0.0)
+            for tid in list(self._task_subprogress.keys())
+        )
+        total_fraction = self._completed_weights + active_sub_sum
+        percent = min(98, max(2, round(2 + 96 * total_fraction)))
+        active_list = self.active_files[:4]
+        self._report_progress(percent, active_list)
+
+    def update_task_subprogress(self, file_path, fraction=0.0, status_text=None):
+        """Reports intra-item progress for multi-page documents (e.g. PDF OCR pages)."""
+        if not file_path:
+            return
+        task_id = os.path.normcase(os.path.normpath(os.path.abspath(file_path)))
+        with self.lock:
+            if hasattr(self, '_task_subprogress'):
+                self._task_subprogress[task_id] = max(0.0, min(1.0, fraction))
+            for item in self.active_files:
+                if item["id"] == task_id:
+                    if status_text:
+                        item["status"] = status_text
+                    break
+            now = time.time()
+            if getattr(self, '_last_progress_report_time', 0.0) + 0.1 <= now:
+                self._last_progress_report_time = now
+                self._recalculate_and_report_progress()
+
     def open_explorer(self, path):
         if not path:
             return False
@@ -866,16 +1013,16 @@ class Api:
             resolved = os.path.normpath(path_str)
 
         if os.path.isfile(resolved):
-            # Mở Windows Explorer và chọn file gốc (không có khoảng trắng sau dấu phẩy)
-            subprocess.Popen(f'explorer.exe /select,"{resolved}"')
+            # Mở Windows Explorer và chọn file gốc (danh sách đối số an toàn)
+            subprocess.Popen(['explorer.exe', f'/select,{resolved}'])
             return True
         elif os.path.isdir(resolved):
-            subprocess.Popen(f'explorer.exe "{resolved}"')
+            subprocess.Popen(['explorer.exe', resolved])
             return True
         else:
             parent = os.path.dirname(resolved)
             if parent and os.path.isdir(parent):
-                subprocess.Popen(f'explorer.exe "{parent}"')
+                subprocess.Popen(['explorer.exe', parent])
                 return True
         return False
 
@@ -1086,29 +1233,27 @@ class Api:
 
     def _detect_domain(self, filepath, rel_path, content_lower):
         rel_path_lower = rel_path.lower()
-        if "07 - it" in rel_path_lower or "cict.qt.it" in rel_path_lower or "cict.cs.it" in rel_path_lower:
+        if "it" in rel_path_lower or "công nghệ" in rel_path_lower or "software" in rel_path_lower or "system" in rel_path_lower:
             return "IT (Công nghệ thông tin)"
-        if "safety" in rel_path_lower or "hsse" in rel_path_lower or "ehs" in rel_path_lower or "pccc" in rel_path_lower or "cnch" in rel_path_lower or "bảo hộ lao động" in content_lower:
+        if "safety" in rel_path_lower or "hsse" in rel_path_lower or "hse" in rel_path_lower or "ehs" in rel_path_lower or "pccc" in rel_path_lower or "cnch" in rel_path_lower or "bảo hộ lao động" in content_lower:
             return "HSSE (An toàn, Môi trường, An ninh)"
-        if "kpi" in rel_path_lower or "okr" in rel_path_lower or "sskpi" in rel_path_lower or "kpi" in content_lower or "okr" in content_lower:
+        if "kpi" in rel_path_lower or "okr" in rel_path_lower or "kpi" in content_lower or "okr" in content_lower:
             return "KPI & OKR (Quản trị hiệu suất)"
-        if "nạo vét" in rel_path_lower or "dredging" in rel_path_lower or "nạo vét duy tu" in content_lower:
-            return "Dredging (Nạo vét bến cảng)"
-        if "06 - hr" in rel_path_lower or "admin" in rel_path_lower or "nhân sự" in rel_path_lower or "hành chính" in rel_path_lower or "lao động" in content_lower or "hchr" in rel_path_lower:
+        if "hr" in rel_path_lower or "admin" in rel_path_lower or "nhân sự" in rel_path_lower or "hành chính" in rel_path_lower or "lao động" in content_lower:
             return "HR & Admin (Nhân sự & Hành chính)"
-        if "09 - operation" in rel_path_lower or "ops" in rel_path_lower or "khai thác" in rel_path_lower or "xếp dỡ" in rel_path_lower or "sà lan" in content_lower or "cảng vụ" in content_lower:
-            return "Operation (Khai thác cảng)"
-        if "02 - finance" in rel_path_lower or "acc" in rel_path_lower or "kế toán" in rel_path_lower or "tài chính" in rel_path_lower or "chi tiêu" in rel_path_lower or "tạm ứng" in rel_path_lower:
+        if "operation" in rel_path_lower or "ops" in rel_path_lower or "khai thác" in rel_path_lower or "vận hành" in rel_path_lower or "sản xuất" in rel_path_lower or "logistics" in rel_path_lower or "kho bãi" in rel_path_lower:
+            return "Operation (Vận hành & Khai thác)"
+        if "finance" in rel_path_lower or "acc" in rel_path_lower or "kế toán" in rel_path_lower or "tài chính" in rel_path_lower or "chi tiêu" in rel_path_lower or "tạm ứng" in rel_path_lower:
             return "Finance & Accounting (Tài chính - Kế toán)"
-        if "08 - marketing" in rel_path_lower or "mkt" in rel_path_lower or "marketing" in rel_path_lower or "khách hàng" in rel_path_lower or "truyền thông" in content_lower:
+        if "marketing" in rel_path_lower or "mkt" in rel_path_lower or "khách hàng" in rel_path_lower or "sales" in rel_path_lower or "kinh doanh" in rel_path_lower or "truyền thông" in content_lower:
             return "Marketing & Sales (Tiếp thị & Chăm sóc khách hàng)"
             
         if "công nghệ thông tin" in content_lower or "phần mềm" in content_lower or "máy tính" in content_lower:
             return "IT (Công nghệ thông tin)"
         if "an toàn lao động" in content_lower or "phòng cháy" in content_lower or "môi trường" in content_lower:
             return "HSSE (An toàn, Môi trường, An ninh)"
-        if "nạo vét" in content_lower or "độ sâu" in content_lower:
-            return "Dredging (Nạo vét bến cảng)"
+        if "vận hành" in content_lower or "quy trình vận hành" in content_lower:
+            return "Operation (Vận hành & Khai thác)"
             
         return "Khác / Chung"
 
@@ -1126,7 +1271,7 @@ class Api:
         return "Tài liệu nghiệp vụ / Báo cáo"
 
     def _detect_language(self, content_lower):
-        en_words = len(re.findall(r'\b(the|and|of|procedure|version|signed|date|page|cai lan|terminal)\b', content_lower))
+        en_words = len(re.findall(r'\b(the|and|of|procedure|version|signed|date|page|report|manual|document|policy)\b', content_lower))
         vn_chars = len(re.findall(r'[áàảãạăắằẳẵặâấầẩẫậéèẻẽẹêếềểễệíìỉĩịóòỏõọôốồổỗộơớờởỡợúùủũụưứừửữựýỳỷỹỵđ]', content_lower))
         if en_words > 15 and vn_chars < 10:
             return "Tiếng Anh (EN)"
@@ -1362,38 +1507,53 @@ class Api:
                         })
                         continue
                     
-                    dest_html_dir = os.path.join(dest_folder_html_root, rel_dir)
-                    os.makedirs(dest_html_dir, exist_ok=True)
-                    new_html_path = self._html_cache_path(dest_html_dir, file_path)
-
-                    is_stale = self._markdown_needs_refresh(new_markdown_path, file_path, scan_target) or not os.path.exists(new_html_path)
+                    is_stale = self._markdown_needs_refresh(new_markdown_path, file_path, scan_target)
                     if is_stale:
                         stage_md_path = os.path.join(
                             staging_root,
                             os.path.relpath(new_markdown_path, dest_folder_md_root),
                         )
-                        stage_html_path = os.path.join(
-                            staging_root,
-                            "HTML",
-                            os.path.relpath(new_html_path, dest_folder_html_root),
-                        )
                         tasks.append({
                             'src_path': file_path,
                             'dest_md_path': new_markdown_path,
                             'stage_md_path': stage_md_path,
-                            'dest_html_path': new_html_path,
-                            'stage_html_path': stage_html_path,
-                            'scan_target': scan_target
+                            'scan_target': scan_target,
+                            'size': source_size,
                         })
 
         # Thực thi xử lý đa luồng với kiểm soát tài nguyên
         total_tasks = len(tasks)
+        total_bytes = sum(t.get('size', 1024) for t in tasks)
         completed_tasks = 0
 
         # Reset các cờ kiểm soát quét
         self._scan_paused = False
         self._scan_aborted = False
         self._pause_event.set()
+
+        with self.lock:
+            self._task_weights = {}
+            self._task_subprogress = {}
+            self._completed_weights = 0.0
+            self._last_progress_report_time = 0.0
+            for t in tasks:
+                t_id = os.path.normcase(os.path.normpath(os.path.abspath(t['src_path'])))
+                t_size = t.get('size', 1024)
+                if total_bytes > 0 and total_tasks > 0:
+                    weight = 0.70 * (t_size / total_bytes) + 0.30 * (1.0 / total_tasks)
+                elif total_tasks > 0:
+                    weight = 1.0 / total_tasks
+                else:
+                    weight = 0.0
+                self._task_weights[t_id] = weight
+                self._task_subprogress[t_id] = 0.0
+
+        if total_tasks > 0:
+            # Giai đoạn chuẩn bị hoàn tất: báo ngay 2% tức thời tránh hiểu nhầm treo
+            self._report_progress(2, [])
+
+        workers = self.get_safe_workers_count()
+        regulator = DynamicWorkerRegulator(self.get_system_ram_load, base_workers=workers)
 
         def run_single_task(task):
             nonlocal completed_tasks, new_files_count
@@ -1415,90 +1575,98 @@ class Api:
             
             with self.lock:
                 self.active_files.append({"id": task_id, "filename": filename, "status": "Pending"})
-                active_list = self.active_files[:4]
-                percent = int((completed_tasks / total_tasks) * 100)
-                self._report_progress(percent, active_list)
-                
-            success = False
-            try:
-                # Cập nhật trạng thái thành Working ngay trước khi chạy chuyển đổi
-                with self.lock:
-                    for item in self.active_files:
-                        if item["id"] == task_id:
-                            item["status"] = "Working"
-                            break
-                    percent = int((completed_tasks / total_tasks) * 100)
-                    self._report_progress(percent, self.active_files[:4])
+                self._recalculate_and_report_progress()
 
-                # convert file
-                if os.path.splitext(src_path)[1].lower() == ".zip":
-                    with open(src_path, "rb") as archive_stream:
-                        result = SafeZipConverter(md_converter).convert(
-                            archive_stream,
-                            StreamInfo(
-                                extension=".zip",
-                                filename=os.path.basename(src_path),
-                                local_path=src_path,
-                            ),
-                        )
-                else:
-                    result = md_converter.convert_local(src_path)
-                
-                if self._scan_aborted:
-                    with self.lock:
-                        self.active_files = [f for f in self.active_files if f["id"] != task_id]
-                        completed_tasks += 1
-                        percent = int((completed_tasks / total_tasks) * 100)
-                        self._report_progress(percent, self.active_files[:4])
-                    return
-
-                converted_text = (result.text_content or "").strip()
-                if converted_text.lower().startswith("error during local"):
-                    raise RuntimeError(converted_text)
-                if not converted_text:
-                    raise ConversionPolicyError("conversion_failed", "Bộ chuyển đổi không tạo được nội dung.")
-                self._write_markdown(stage_md_path, converted_text, src_path, task_scan_target)
-                if task.get('stage_html_path'):
-                    self._write_html(task['stage_html_path'], converted_text, src_path, task_scan_target)
-                success = True
-            except Exception as e:
-                print(f"Error converting task {src_path}: {e}")
-                with self.lock:
-                    scan_errors.append({
-                        "file": src_path,
-                        "code": self._conversion_error_code(e),
-                        "error": str(e)
-                    })
-                if os.path.exists(stage_md_path):
-                    try:
-                        os.remove(stage_md_path)
-                    except Exception:
-                        pass
-                
-            if self._scan_aborted:
-                if os.path.exists(stage_md_path):
-                    try:
-                        os.remove(stage_md_path)
-                    except Exception:
-                        pass
+            if not regulator.acquire(abort_check=lambda: self._scan_aborted):
                 with self.lock:
                     self.active_files = [f for f in self.active_files if f["id"] != task_id]
                     completed_tasks += 1
-                    percent = int((completed_tasks / total_tasks) * 100)
-                    self._report_progress(percent, self.active_files[:4])
+                    self._completed_weights += self._task_weights.get(task_id, 0.0)
+                    self._task_subprogress.pop(task_id, None)
+                    self._recalculate_and_report_progress()
                 return
 
-            with self.lock:
-                self.active_files = [f for f in self.active_files if f["id"] != task_id]
-                if success:
-                    new_files_count += 1
-                completed_tasks += 1
-                percent = int((completed_tasks / total_tasks) * 100)
-                active_list = self.active_files[:4]
-                self._report_progress(percent, active_list)
+            try:
+                success = False
+                try:
+                    # Cập nhật trạng thái thành Working ngay trước khi chạy chuyển đổi
+                    with self.lock:
+                        for item in self.active_files:
+                            if item["id"] == task_id:
+                                item["status"] = "Working"
+                                break
+                        self._recalculate_and_report_progress()
+
+                    # convert file
+                    if os.path.splitext(src_path)[1].lower() == ".zip":
+                        with open(src_path, "rb") as archive_stream:
+                            result = SafeZipConverter(md_converter).convert(
+                                archive_stream,
+                                StreamInfo(
+                                    extension=".zip",
+                                    filename=os.path.basename(src_path),
+                                    local_path=src_path,
+                                ),
+                            )
+                    else:
+                        result = md_converter.convert_local(src_path)
+                    
+                    if self._scan_aborted:
+                        with self.lock:
+                            self.active_files = [f for f in self.active_files if f["id"] != task_id]
+                            completed_tasks += 1
+                            self._completed_weights += self._task_weights.get(task_id, 0.0)
+                            self._task_subprogress.pop(task_id, None)
+                            self._recalculate_and_report_progress()
+                        return
+
+                    converted_text = (result.text_content or "").strip()
+                    if converted_text.lower().startswith("error during local"):
+                        raise RuntimeError(converted_text)
+                    if not converted_text:
+                        raise ConversionPolicyError("conversion_failed", "Bộ chuyển đổi không tạo được nội dung.")
+                    self._write_markdown(stage_md_path, converted_text, src_path, task_scan_target)
+                    success = True
+                except Exception as e:
+                    print(f"Error converting task {src_path}: {e}")
+                    with self.lock:
+                        scan_errors.append({
+                            "file": src_path,
+                            "code": self._conversion_error_code(e),
+                            "error": str(e)
+                        })
+                    if os.path.exists(stage_md_path):
+                        try:
+                            os.remove(stage_md_path)
+                        except Exception:
+                            pass
+                    
+                if self._scan_aborted:
+                    if os.path.exists(stage_md_path):
+                        try:
+                            os.remove(stage_md_path)
+                        except Exception:
+                            pass
+                    with self.lock:
+                        self.active_files = [f for f in self.active_files if f["id"] != task_id]
+                        completed_tasks += 1
+                        self._completed_weights += self._task_weights.get(task_id, 0.0)
+                        self._task_subprogress.pop(task_id, None)
+                        self._recalculate_and_report_progress()
+                    return
+
+                with self.lock:
+                    self.active_files = [f for f in self.active_files if f["id"] != task_id]
+                    if success:
+                        new_files_count += 1
+                    completed_tasks += 1
+                    self._completed_weights += self._task_weights.get(task_id, 0.0)
+                    self._task_subprogress.pop(task_id, None)
+                    self._recalculate_and_report_progress()
+            finally:
+                regulator.release()
 
         if total_tasks > 0:
-            workers = self.get_safe_workers_count()
             self.executor = ThreadPoolExecutor(max_workers=workers)
             try:
                 # Chạy đa luồng bằng executor.map
@@ -1522,10 +1690,6 @@ class Api:
             if os.path.exists(stage_path):
                 os.makedirs(os.path.dirname(task['dest_md_path']), exist_ok=True)
                 os.replace(stage_path, task['dest_md_path'])
-            stage_html = task.get('stage_html_path')
-            if stage_html and os.path.exists(stage_html):
-                os.makedirs(os.path.dirname(task['dest_html_path']), exist_ok=True)
-                os.replace(stage_html, task['dest_html_path'])
         shutil.rmtree(staging_root, ignore_errors=True)
 
         # Ghi nhận file mồ côi; chỉ xóa sau khi index mới commit thành công.
@@ -1675,9 +1839,8 @@ class Api:
         output_tmp = f"{output_js}.tmp-{os.getpid()}"
         status_tmp = f"{self.runtime_status_file}.tmp-{os.getpid()}"
         try:
-            db_json = json.dumps(db_entries, ensure_ascii=False, indent=2)
             with open(output_tmp, 'w', encoding='utf-8', newline='\n') as f:
-                f.write(f"var SEARCH_DB = {db_json};\n")
+                f.write("var SEARCH_DB = [];\n")
 
             scanned_dict = {}
             if os.path.exists(self.runtime_status_file):
@@ -1700,7 +1863,7 @@ class Api:
             return {"success": False, "error": f"Không thể chuẩn bị index runtime: {e}"}
 
         try:
-            self.index_store.replace_entries(db_entries)
+            self.index_store.sync_entries(db_entries, scan_id=scan_id)
             os.replace(output_tmp, output_js)
             os.replace(status_tmp, self.runtime_status_file)
         except Exception as e:

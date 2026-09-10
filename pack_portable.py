@@ -67,6 +67,7 @@ def main():
 
         runtime_root = os.path.join(temp_dir, "runtime")
         os.makedirs(os.path.join(runtime_root, "MARKDOWN"), exist_ok=True)
+        os.makedirs(os.path.join(runtime_root, "HTML"), exist_ok=True)
         for name, content in (("config.json", "{}\n"), ("index_status.json", "{}\n"), ("search_db.js", "var SEARCH_DB = [];\n")):
             with open(os.path.join(runtime_root, name), "w", encoding="utf-8", newline="\n") as handle:
                 handle.write(content)
