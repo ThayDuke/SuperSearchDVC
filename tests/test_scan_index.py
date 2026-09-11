@@ -177,6 +177,30 @@ class ScanIndexRegressionTests(unittest.TestCase):
             self.assertFalse(second_result["success"])
             self.assertEqual(api.get_index_stats()["total"], 1)
 
+    def test_scan_and_index_commit_failure_returns_error_key(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            app_dir = os.path.join(temp_dir, "app")
+            source_dir = os.path.join(temp_dir, "documents")
+            os.makedirs(source_dir)
+            with open(os.path.join(source_dir, "doc.txt"), "w", encoding="utf-8") as f:
+                f.write("Nội dung tài liệu kiểm thử lỗi commit.")
+
+            api = Api(app_dir)
+            api.scan_dir = source_dir
+
+            # Force sync_entries to fail
+            def failing_sync(*args, **kwargs):
+                raise RuntimeError("Giả lập lỗi khóa cơ sở dữ liệu SQLite")
+
+            api.index_store.sync_entries = failing_sync
+            result = api.scan_and_index()
+
+            self.assertFalse(result["success"])
+            self.assertIn("error", result)
+            self.assertIn("Giả lập lỗi khóa", result["error"])
+            self.assertGreater(result["error_count"], 0)
+
 
 if __name__ == "__main__":
     unittest.main()
+

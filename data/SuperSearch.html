@@ -2971,7 +2971,8 @@
                                 showScanTooltip("");
                             }, 3000);
                         } else {
-                            alert("Lỗi khi quét: " + result.error);
+                            const errorMsg = result.error || (result.errors && result.errors.length ? result.errors[0].error : (result.error_summary ? Object.entries(result.error_summary).map(([k, v]) => `${k}: ${v}`).join(", ") : "Lỗi không xác định"));
+                            alert("Lỗi khi quét: " + errorMsg);
                         }
                     }
                 }).catch(function (err) {

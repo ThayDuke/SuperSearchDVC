@@ -307,12 +307,12 @@ class LocalOcrPdfConverter(DocumentConverter):
                             and getattr(self.api, 'gemini_api_key', None)
                         ):
                             try:
-                                page_img = page.to_image(resolution=150)
+                                page_img = page.to_image(resolution=200)
                                 img_bytes = io.BytesIO()
                                 rgb_img = page_img.original
                                 if rgb_img.mode in ("RGBA", "P", "LA"):
                                     rgb_img = rgb_img.convert("RGB")
-                                rgb_img.save(img_bytes, format='JPEG', quality=85)
+                                rgb_img.save(img_bytes, format='JPEG', quality=88)
                                 rendered_img_bytes = img_bytes.getvalue()
                                 gemini_text = ocr_pdf_page_bytes(
                                     rendered_img_bytes,
@@ -330,12 +330,12 @@ class LocalOcrPdfConverter(DocumentConverter):
                         else:
                             with self.api.ocr_lock:
                                 if rendered_img_bytes is None:
-                                    page_img = page.to_image(resolution=150)
+                                    page_img = page.to_image(resolution=200)
                                     img_bytes = io.BytesIO()
                                     rgb_img = page_img.original
                                     if rgb_img.mode in ("RGBA", "P", "LA"):
                                         rgb_img = rgb_img.convert("RGB")
-                                    rgb_img.save(img_bytes, format='JPEG', quality=85)
+                                    rgb_img.save(img_bytes, format='JPEG', quality=88)
                                     rendered_img_bytes = img_bytes.getvalue()
                                 with Image.open(io.BytesIO(rendered_img_bytes)) as image:
                                     text = pytesseract.image_to_string(image, lang='vie+eng').strip()
@@ -1313,7 +1313,7 @@ class Api:
         try:
             with open(path, 'r', encoding='utf-8', errors='ignore') as f:
                 head = f.read(2000)
-            for key in ("ORIGINAL_PATH", "SCAN_TARGET", "SOURCE_SIZE", "SOURCE_MTIME_NS", "SOURCE_SHA256"):
+            for key in ("ORIGINAL_PATH", "SCAN_TARGET", "SOURCE_SIZE", "SOURCE_MTIME_NS", "SOURCE_SHA256", "OCR_CONFIG"):
                 match = re.search(rf'<!--\s*{key}:\s*(.*?)\s*-->', head)
                 if match:
                     metadata[key] = match.group(1).strip()
@@ -1340,9 +1340,24 @@ class Api:
             stored_hash = metadata.get("SOURCE_SHA256", "")
             if not stored_hash:
                 return True
-            return self._source_signature(source_path, include_hash=True).get("sha256") != stored_hash
+            if self._source_signature(source_path, include_hash=True).get("sha256") != stored_hash:
+                return True
         except (TypeError, ValueError):
             return True
+
+        # Invalidate OCR cache when OCR engine or credentials change
+        ext = self._infer_original_ext(source_path)
+        if ext in IMAGE_EXTENSIONS or ext == '.pdf':
+            has_gemini = bool(getattr(self, 'gemini_api_key', ''))
+            engine = getattr(self, 'ocr_engine', 'hybrid')
+            model = getattr(self, 'gemini_model', 'gemini-3.6-flash')
+            current_tag = f"{engine}:{model}" if has_gemini else "local"
+            stored_tag = metadata.get("OCR_CONFIG", "")
+            if has_gemini and engine in ('hybrid', 'gemini'):
+                if not stored_tag or "gemini" not in stored_tag or stored_tag != current_tag:
+                    return True
+
+        return False
 
     def _html_cache_path(self, directory, source_path):
         normalized = os.path.normcase(os.path.normpath(os.path.abspath(source_path)))
@@ -1366,13 +1381,18 @@ class Api:
     def _write_markdown(self, path, content, source_path, scan_target):
         source = self._source_signature(source_path, include_hash=True) or {"size": 0, "mtime_ns": 0, "sha256": ""}
         body = content or ""
-        body = re.sub(r'^<!--\s*(?:ORIGINAL_PATH|SCAN_TARGET|SOURCE_SIZE|SOURCE_MTIME_NS|SOURCE_SHA256):.*?-->\s*\n?', '', body, flags=re.MULTILINE)
+        body = re.sub(r'^<!--\s*(?:ORIGINAL_PATH|SCAN_TARGET|SOURCE_SIZE|SOURCE_MTIME_NS|SOURCE_SHA256|OCR_CONFIG):.*?-->\s*\n?', '', body, flags=re.MULTILINE)
+        has_gemini = bool(getattr(self, 'gemini_api_key', ''))
+        engine = getattr(self, 'ocr_engine', 'hybrid')
+        model = getattr(self, 'gemini_model', 'gemini-3.6-flash')
+        ocr_tag = f"{engine}:{model}" if has_gemini else "local"
         header = (
             f"<!-- ORIGINAL_PATH: {os.path.abspath(source_path)} -->\n"
             f"<!-- SCAN_TARGET: {os.path.abspath(scan_target)} -->\n"
             f"<!-- SOURCE_SIZE: {source['size']} -->\n"
             f"<!-- SOURCE_MTIME_NS: {source['mtime_ns']} -->\n"
-            f"<!-- SOURCE_SHA256: {source.get('sha256', '')} -->\n\n"
+            f"<!-- SOURCE_SHA256: {source.get('sha256', '')} -->\n"
+            f"<!-- OCR_CONFIG: {ocr_tag} -->\n\n"
         )
         temp_path = f"{path}.tmp-{os.getpid()}-{threading.get_ident()}"
         os.makedirs(os.path.dirname(path), exist_ok=True)
@@ -1862,10 +1882,20 @@ class Api:
                     pass
             return {"success": False, "error": f"Không thể chuẩn bị index runtime: {e}"}
 
+        def _safe_replace_file(src, dst, max_retries=5, delay=0.15):
+            for attempt in range(max_retries):
+                try:
+                    os.replace(src, dst)
+                    return
+                except OSError:
+                    if attempt == max_retries - 1:
+                        raise
+                    time.sleep(delay)
+
         try:
             self.index_store.sync_entries(db_entries, scan_id=scan_id)
-            os.replace(output_tmp, output_js)
-            os.replace(status_tmp, self.runtime_status_file)
+            _safe_replace_file(output_tmp, output_js)
+            _safe_replace_file(status_tmp, self.runtime_status_file)
         except Exception as e:
             for temp_path in (output_tmp, status_tmp):
                 try:
@@ -1881,6 +1911,7 @@ class Api:
             print(f"Error committing runtime index: {e}")
             return {
                 "success": False,
+                "error": f"Lỗi lưu trữ chỉ mục: {e}",
                 "new_files": 0,
                 "total_entries": 0,
                 "errors": scan_errors[:50],

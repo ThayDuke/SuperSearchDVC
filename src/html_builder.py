@@ -320,6 +320,10 @@ def markdown_to_html_body(markdown_text):
                 tbl.append("</tbody></table></div>")
                 html_out.append("".join(tbl))
                 continue
+            else:
+                for tl in table_lines:
+                    html_out.append(f"<p>{_format_inline(tl)}</p>")
+                continue
 
         # Blockquote (> quote)
         if stripped.startswith(">"):
@@ -335,8 +339,8 @@ def markdown_to_html_body(markdown_text):
             continue
 
         # Lists (unordered - * + or ordered 1. 2.)
-        ul_match = re.match(r"^[\*\-\+]\s+(.+)$", stripped)
-        ol_match = re.match(r"^\d+\.\s+(.+)$", stripped)
+        ul_match = re.match(r"^[\*\-\+]\s+(.*)$", stripped)
+        ol_match = re.match(r"^\d+\.\s+(.*)$", stripped)
         if ul_match or ol_match:
             is_ol = bool(ol_match)
             tag = "ol" if is_ol else "ul"
@@ -345,9 +349,9 @@ def markdown_to_html_body(markdown_text):
                 cur_line = lines[i].strip()
                 if not cur_line:
                     break
-                m = re.match(r"^\d+\.\s+(.+)$" if is_ol else r"^[\*\-\+]\s+(.+)$", cur_line)
+                m = re.match(r"^\d+\.\s+(.*)$" if is_ol else r"^[\*\-\+]\s+(.*)$", cur_line)
                 if m:
-                    item_text = _format_inline(m.group(1))
+                    item_text = _format_inline(m.group(1).strip())
                     html_out.append(f"<li>{item_text}</li>")
                     i += 1
                 else:
@@ -359,10 +363,27 @@ def markdown_to_html_body(markdown_text):
             html_out.append(f"</{tag}>")
             continue
 
-        # Regular Paragraph
-        p_lines = []
-        while i < n and lines[i].strip() and not lines[i].strip().startswith("```") and not lines[i].strip().startswith("#") and not lines[i].strip().startswith(">") and not re.match(r"^[\*\-\+]\s+", lines[i].strip()) and not re.match(r"^\d+\.\s+", lines[i].strip()) and not ("|" in lines[i] and i + 1 < n and re.match(r"^\s*\|?[\s\-:|]+\|?\s*$", lines[i + 1])):
-            p_lines.append(lines[i].strip())
+        # Regular Paragraph - always consumes at least 1 line to guarantee termination
+        p_lines = [stripped]
+        i += 1
+        while i < n:
+            next_line = lines[i]
+            next_stripped = next_line.strip()
+            if not next_stripped:
+                break
+            if next_stripped.startswith("```"):
+                break
+            if re.match(r"^#{1,6}\s+", next_stripped):
+                break
+            if re.match(r"^(\-{3,}|\*{3,}|_{3,})$", next_stripped):
+                break
+            if next_stripped.startswith(">"):
+                break
+            if re.match(r"^[\*\-\+]\s+", next_stripped) or re.match(r"^\d+\.\s+", next_stripped):
+                break
+            if "|" in next_line and i + 1 < n and re.match(r"^\s*\|?[\s\-:|]+\|?\s*$", lines[i + 1]):
+                break
+            p_lines.append(next_stripped)
             i += 1
         p_content = "<br>".join([_format_inline(pl) for pl in p_lines])
         html_out.append(f"<p>{p_content}</p>")
