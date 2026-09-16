@@ -6,6 +6,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SuperSearch - Tra cứu tài liệu siêu tốc</title>
     <link rel="icon" type="image/x-icon" href="LogoSS32.ico">
+    <link rel="stylesheet" href="vendor/katex/katex.min.css">
+    <script src="vendor/katex/katex.min.js"></script>
+    <script src="vendor/katex/auto-render.min.js"></script>
     <style>
         :root {
             /* Pearl Light Theme (Mặc định) */
@@ -2001,6 +2004,50 @@
             user-select: text !important;
             -webkit-user-select: text !important;
         }
+        .quick-view-modal.compare-mode {
+            max-width: 1260px;
+            width: 96%;
+        }
+        .compare-toolbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 8px 14px;
+            background: rgba(15, 23, 42, 0.4);
+            border-bottom: 1px solid var(--glass-border);
+            font-size: 13px;
+            flex-shrink: 0;
+        }
+        .compare-split-container {
+            display: flex;
+            flex: 1;
+            min-height: 0;
+            width: 100%;
+            overflow: hidden;
+        }
+        .compare-col-image {
+            flex: 1;
+            min-width: 0;
+            height: 100%;
+            overflow: auto;
+            background: rgba(0, 0, 0, 0.35);
+            display: flex;
+            align-items: flex-start;
+            justify-content: center;
+            padding: 16px;
+            border-right: 1px solid var(--glass-border);
+            position: relative;
+        }
+        .compare-col-text {
+            flex: 1;
+            min-width: 0;
+            height: 100%;
+            overflow-y: auto;
+            padding: 18px 22px;
+            font-size: 14.5px;
+            line-height: 1.65;
+            color: var(--text-primary);
+        }
         .quick-view-html-pane {
             color: var(--text-primary);
             font-size: 14.5px;
@@ -2198,7 +2245,7 @@
         <div class="landing-only">
             <div class="logo-container">
                 <div class="logo-title">SuperSearch</div>
-                <div class="logo-sub">Hệ thống tra cứu tài liệu siêu tốc CICT</div>
+                <div class="logo-sub">Hệ thống tra cứu tài liệu siêu tốc</div>
             </div>
         </div>
 
@@ -2339,7 +2386,7 @@
                 <div class="modal-title" id="modalTitle">Tiêu đề tài liệu</div>
                 <button class="modal-close-btn" onclick="closeQuickView()">&times;</button>
             </div>
-            <!-- Thanh Tab chuyển đổi giữa HTML (Người đọc) và Markdown (AI Agent) -->
+            <!-- Thanh Tab chuyển đổi giữa HTML (Người đọc), Markdown (AI Agent) và Đối chiếu 1:1 -->
             <div class="modal-tabs-bar">
                 <button class="quick-view-tab-btn active" id="tabBtnHtml" onclick="switchQuickViewTab('html')">
                     <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
@@ -2348,6 +2395,10 @@
                 <button class="quick-view-tab-btn" id="tabBtnMarkdown" onclick="switchQuickViewTab('markdown')">
                     <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
                     Markdown (AI Agent)
+                </button>
+                <button class="quick-view-tab-btn" id="tabBtnCompare" onclick="switchQuickViewTab('compare')">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M12 3v18"/></svg>
+                    Đối chiếu 1:1
                 </button>
                 <div style="flex: 1;"></div>
                 <button class="quick-view-tab-btn" id="btnCopyQuickView" onclick="copyQuickViewContent()" title="Sao chép nội dung">
@@ -2362,9 +2413,41 @@
                 </div>
                 <!-- Tab 2: Markdown View (AI Agent) -->
                 <pre class="quick-view-pane quick-view-markdown-pane" id="quickViewMarkdownPane" style="display: none;"><code id="quickViewMarkdownCode"></code></pre>
+                <!-- Tab 3: Đối chiếu 1:1 Side-by-side View -->
+                <div class="quick-view-pane" id="quickViewComparePane" style="display: none; padding: 0; flex-direction: column; overflow: hidden; width: 100%; height: 100%;">
+                    <div class="compare-toolbar">
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <button class="landing-btn" style="padding: 4px 10px; font-size: 12px;" onclick="changeComparePage(-1)" id="btnComparePrev">‹ Trang trước</button>
+                            <span id="comparePageLabel" style="font-family: monospace; font-weight: 700; color: #60a5fa; padding: 0 4px;">Trang 1 / 1</span>
+                            <button class="landing-btn" style="padding: 4px 10px; font-size: 12px;" onclick="changeComparePage(1)" id="btnCompareNext">Trang sau ›</button>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 6px;">
+                            <button class="landing-btn" style="padding: 4px 8px; font-size: 12px;" onclick="zoomCompareImage(1.15)">Phóng to +</button>
+                            <button class="landing-btn" style="padding: 4px 8px; font-size: 12px;" onclick="zoomCompareImage(0.85)">Thu nhỏ -</button>
+                            <button class="landing-btn" style="padding: 4px 8px; font-size: 12px;" onclick="resetCompareZoom()">100%</button>
+                        </div>
+                    </div>
+                    <div class="compare-split-container">
+                        <div class="compare-col-image">
+                            <div id="compareImageLoading" style="display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: var(--text-muted); font-size: 13px; background: rgba(0,0,0,0.7); padding: 8px 16px; border-radius: 8px; z-index: 5;">Đang tải ảnh trang scan...</div>
+                            <img id="compareScanImage" src="" alt="Trang scan gốc" style="max-width: 100%; height: auto; box-shadow: 0 4px 20px rgba(0,0,0,0.5); border-radius: 4px; transition: transform 0.15s ease;" />
+                        </div>
+                        <div class="compare-col-text quick-view-html-pane" id="compareTextPane">
+                            <!-- Nội dung văn bản OCR của trang tương ứng -->
+                        </div>
+                    </div>
+                </div>
                 <div id="scrollbarMarkerTrack" style="position: absolute; right: 0; top: 0; width: 14px; height: 100%; z-index: 10; background: transparent; pointer-events: none;"></div>
             </div>
             <div class="modal-footer">
+                <button class="landing-btn" id="btnExportDocx" onclick="exportQuickView('docx')" style="display: inline-flex; align-items: center; gap: 6px; background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.4); color: #34d399; font-weight: 600;">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
+                    Xuất Word (.docx)
+                </button>
+                <button class="landing-btn" id="btnExportMd" onclick="exportQuickView('md')" style="display: inline-flex; align-items: center; gap: 6px; background: rgba(139, 92, 246, 0.15); border: 1px solid rgba(139, 92, 246, 0.4); color: #a78bfa; font-weight: 600;">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                    Xuất Markdown (.md)
+                </button>
                 <button class="landing-btn" id="btnQuickViewOpenFile" onclick="openQuickViewOriginalFile()" style="display: inline-flex; align-items: center; gap: 6px; background: rgba(59, 130, 246, 0.15); border: 1px solid rgba(59, 130, 246, 0.4); color: #60a5fa; font-weight: 600;">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-external-link"><path d="M15 3h6v6"></path><path d="M10 14 21 3"></path><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path></svg>
                     Đến file gốc
@@ -2384,8 +2467,8 @@
             <div class="modal-body" id="lgAlertBody" style="font-size: 14.5px; line-height: 1.6; word-wrap: break-word; white-space: pre-wrap; color: var(--text-primary);">
                 <!-- Nội dung thông báo -->
             </div>
-            <div class="modal-footer" style="border-top: 1px solid var(--glass-border); padding-top: 0.75rem; display: flex; justify-content: flex-end;">
-                <button class="landing-btn" style="color: var(--accent-blue) !important; border-color: rgba(59, 130, 246, 0.35) !important;" onclick="closeLgAlert()">Xác nhận</button>
+            <div class="modal-footer" id="lgAlertActions" style="border-top: 1px solid var(--glass-border); padding-top: 0.75rem; display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap;">
+                <button class="landing-btn" id="lgAlertConfirmBtn" style="color: var(--accent-blue) !important; border-color: rgba(59, 130, 246, 0.35) !important;" onclick="closeLgAlert()">Xác nhận</button>
             </div>
         </div>
     </div>
@@ -2506,6 +2589,8 @@
         let backendStats = { total: 0, extensions: {}, years: {}, domains: {} };
         let backendRequiresReindex = false;
         let backendReindexWarningShown = false;
+        let backendCapabilities = null;
+        let backendBridgeInitialized = false;
 
         let filteredResults = [];
         let currentPage = 1;
@@ -2619,7 +2704,7 @@
             backendMode = Boolean(window.pywebview && window.pywebview.api && window.pywebview.api.search_documents);
             // Build stats/vocabulary from SQLite API when running in the desktop app.
             if (backendMode) {
-                loadBackendIndex();
+                initializeBackendBridge();
             } else {
                 buildDashboardStats();
                 buildVocabulary();
@@ -2649,7 +2734,55 @@
             } else {
                 window.addEventListener('pywebviewready', initFolderConfig);
             }
+            window.addEventListener('pywebviewready', initializeBackendBridge, { once: true });
         };
+
+        function setBackendButtonState() {
+            const caps = backendCapabilities || {};
+            const docxBtn = document.getElementById('btnExportDocx');
+            const mdBtn = document.getElementById('btnExportMd');
+            const openBtn = document.getElementById('btnQuickViewOpenFile');
+            if (docxBtn) {
+                docxBtn.disabled = caps.export_docx === false;
+                docxBtn.title = caps.export_docx === false ? 'Cần cài python-docx hoặc cập nhật SuperSearch.exe' : 'Xuất Word (.docx)';
+            }
+            if (mdBtn) {
+                mdBtn.disabled = caps.export_markdown === false;
+                mdBtn.title = caps.export_markdown === false ? 'Cần cập nhật SuperSearch.exe' : 'Xuất Markdown (.md)';
+            }
+            if (openBtn) {
+                openBtn.disabled = caps.open_document_location === false && caps.open_explorer === false;
+                openBtn.title = openBtn.disabled ? 'Cần cập nhật SuperSearch.exe' : 'Mở file gốc';
+            }
+        }
+
+        function initializeBackendBridge() {
+            const api = window.pywebview && window.pywebview.api;
+            if (!api || !api.search_documents || backendBridgeInitialized) return;
+            backendBridgeInitialized = true;
+            backendMode = true;
+            const fallbackCapabilities = {
+                api_version: 1,
+                export_document: Boolean(api.export_document),
+                export_docx: Boolean(api.export_document),
+                export_markdown: Boolean(api.export_document),
+                open_document_location: Boolean(api.open_document_location),
+                open_explorer: Boolean(api.open_explorer),
+                spelling_suggestion: false
+            };
+            const capabilityPromise = api.get_runtime_capabilities
+                ? api.get_runtime_capabilities()
+                : Promise.resolve(fallbackCapabilities);
+            capabilityPromise.then(caps => {
+                backendCapabilities = Object.assign(fallbackCapabilities, caps || {});
+                setBackendButtonState();
+                loadBackendIndex();
+            }).catch(() => {
+                backendCapabilities = fallbackCapabilities;
+                setBackendButtonState();
+                loadBackendIndex();
+            });
+        }
 
         function loadBackendIndex() {
             backendMode = Boolean(window.pywebview && window.pywebview.api && window.pywebview.api.search_documents);
@@ -2971,7 +3104,12 @@
                                 showScanTooltip("");
                             }, 3000);
                         } else {
-                            const errorMsg = result.error || (result.errors && result.errors.length ? result.errors[0].error : (result.error_summary ? Object.entries(result.error_summary).map(([k, v]) => `${k}: ${v}`).join(", ") : "Lỗi không xác định"));
+                            const failureSummary = result.error_summary || {};
+                            const failureDetails = Object.entries(failureSummary).map(([key, value]) => `${key}: ${value}`).join(", ");
+                            let errorMsg = result.error || (result.errors && result.errors.length ? result.errors[0].error : (failureDetails || "Lỗi không xác định"));
+                            if (failureDetails && !errorMsg.includes(failureDetails)) {
+                                errorMsg += ` Chi tiết: ${failureDetails}.`;
+                            }
                             alert("Lỗi khi quét: " + errorMsg);
                         }
                     }
@@ -3720,14 +3858,23 @@
                 backendTotal = Number(result && result.total || 0);
                 filteredResults = Array.isArray(result && result.documents) ? result.documents : [];
                 currentMatchedDocs = filteredResults.slice();
-                currentPage = Number(result && result.page || page || 1);
+                 currentPage = Number(result && result.page || page || 1);
                 backendRequiresReindex = Boolean(result && result.requires_reindex);
                 const elapsed = ((performance.now() - started) / 1000).toFixed(3);
                 const countText = document.getElementById("resultsCountText");
                 const countLabel = result && result.truncated ? "Tìm thấy ít nhất" : "Tìm thấy";
                 if (countText) countText.textContent = `${countLabel} ${backendTotal} kết quả (${elapsed} giây)`;
-                const spellingBanner = document.getElementById("spellingBanner");
-                if (spellingBanner) spellingBanner.style.display = "none";
+                 const spellingBanner = document.getElementById("spellingBanner");
+                 if (spellingBanner) {
+                     const suggested = String(result && result.suggested_query || '').trim();
+                     const original = String(result && result.original_query || activeQuery || '').trim();
+                     if (backendTotal === 0 && suggested && suggested.toLowerCase() !== original.toLowerCase()) {
+                         renderSpellingBanner(spellingBanner, "Không tìm thấy kết quả cho", original, "Có phải ý bạn là:", suggested, searchSuggestionDirect, true);
+                         spellingBanner.style.display = "block";
+                     } else {
+                         spellingBanner.style.display = "none";
+                     }
+                 }
                 const words = Array.isArray(result && result.query_tokens)
                     ? result.query_tokens
                     : filterSearchWords(tokenize(removeDiacritics(activeQuery)));
@@ -4066,7 +4213,7 @@
                 });
                 row.querySelector(".answer-path-btn").addEventListener("click", event => {
                     event.stopPropagation();
-                    copyPathToClipboard(sourceDoc.absolute_original_path || sourceDoc.original_path || sourceDoc.path);
+                    copyPathToClipboard(sourceDoc.absolute_original_path || sourceDoc.original_path || sourceDoc.path, sourceDoc.document_id);
                 });
             });
         }
@@ -4149,7 +4296,7 @@
                 const pathButton = item.querySelector(".copy-path-btn");
                 pathButton.addEventListener("click", event => {
                     event.stopPropagation();
-                    if (absoluteWindowsPath) copyPathToClipboard(absoluteWindowsPath);
+                    if (absoluteWindowsPath) copyPathToClipboard(absoluteWindowsPath, doc.document_id);
                 });
             });
 
@@ -4423,12 +4570,38 @@
 
         function openQuickViewOriginalFile() {
             if (!currentQuickViewDoc) return;
+            const api = window.pywebview && window.pywebview.api;
+            if (currentQuickViewDoc.document_id && api && api.open_document_location) {
+                api.open_document_location(currentQuickViewDoc.document_id).then(res => {
+                    if (res && res.success) {
+                        showToast(res.action === 'selected_file'
+                            ? "Đang mở thư mục và chọn file gốc trong Windows Explorer..."
+                            : "Đã mở thư mục chứa file gốc trong Windows Explorer.");
+                    } else {
+                        showToast((res && res.error) || "Không tìm thấy file gốc.");
+                    }
+                }).catch(error => showToast("Không thể mở file gốc: " + String(error)));
+                return;
+            }
             const targetPath = currentQuickViewDoc.absolute_original_path || currentQuickViewDoc.original_path || currentQuickViewDoc.path || "";
             openFileLocation(targetPath);
         }
 
         // Action mở file gốc và clipboard
-        function copyPathToClipboard(pathStr) {
+        function copyPathToClipboard(pathStr, documentId) {
+            const api = window.pywebview && window.pywebview.api;
+            if (documentId && api && api.open_document_location) {
+                api.open_document_location(documentId).then(res => {
+                    if (res && res.success) {
+                        showToast(res.action === 'selected_file'
+                            ? "Đang mở thư mục và chọn file gốc trong Windows Explorer..."
+                            : "Đã mở thư mục chứa file gốc trong Windows Explorer.");
+                    } else {
+                        showToast((res && res.error) || "Không tìm thấy file gốc.");
+                    }
+                }).catch(error => showToast("Không thể mở file gốc: " + String(error)));
+                return;
+            }
             openFileLocation(pathStr);
         }
 
@@ -4493,6 +4666,19 @@
             showLgAlert(message, "Thông báo");
         };
 
+        function resetLgAlertActions() {
+            const actions = document.getElementById("lgAlertActions");
+            if (!actions) return;
+            actions.replaceChildren();
+            const confirm = document.createElement("button");
+            confirm.id = "lgAlertConfirmBtn";
+            confirm.className = "landing-btn";
+            confirm.style.cssText = "color: var(--accent-blue) !important; border-color: rgba(59, 130, 246, 0.35) !important;";
+            confirm.textContent = "Xác nhận";
+            confirm.addEventListener("click", () => closeLgAlert());
+            actions.appendChild(confirm);
+        }
+
         function showLgAlert(message, title = "Thông báo") {
             const overlay = document.getElementById("lgAlertOverlay");
             const titleEl = document.getElementById("lgAlertTitle");
@@ -4501,6 +4687,7 @@
 
             titleEl.textContent = title;
             bodyEl.textContent = message;
+            resetLgAlertActions();
             overlay.style.display = "flex";
 
             // Đóng bằng Enter hoặc Escape
@@ -4513,6 +4700,42 @@
             };
             document.removeEventListener("keydown", handleAlertKey);
             document.addEventListener("keydown", handleAlertKey);
+        }
+
+        function showExportSuccessDialog(result, format) {
+            const overlay = document.getElementById("lgAlertOverlay");
+            const titleEl = document.getElementById("lgAlertTitle");
+            const bodyEl = document.getElementById("lgAlertBody");
+            const actions = document.getElementById("lgAlertActions");
+            if (!overlay || !titleEl || !bodyEl || !actions) return;
+
+            titleEl.textContent = "Xuất tệp thành công";
+            bodyEl.replaceChildren();
+            const lead = document.createElement("div");
+            lead.textContent = "Đã tạo tệp xuất thành công:";
+            const fileName = document.createElement("div");
+            fileName.style.cssText = "margin-top: 10px; font-weight: 700; overflow-wrap: anywhere; word-break: break-word;";
+            fileName.textContent = String(result && result.filename || "");
+            const path = document.createElement("code");
+            path.style.cssText = "display: block; margin-top: 8px; padding: 8px 10px; border-radius: 8px; background: rgba(15, 23, 42, 0.08); white-space: pre-wrap; overflow-wrap: anywhere; word-break: break-word; user-select: text;";
+            path.textContent = String(result && result.path || "");
+            bodyEl.append(lead, fileName, path);
+
+            actions.replaceChildren();
+            const goButton = document.createElement("button");
+            goButton.className = "landing-btn";
+            goButton.style.cssText = "color: var(--accent-blue) !important; border-color: rgba(59, 130, 246, 0.35) !important;";
+            goButton.textContent = format === "docx" ? "Đến file docx" : "Đến file markdown";
+            goButton.addEventListener("click", () => {
+                closeLgAlert();
+                openFileLocation(String(result && result.path || ""));
+            });
+            const confirm = document.createElement("button");
+            confirm.className = "landing-btn";
+            confirm.textContent = "Đóng";
+            confirm.addEventListener("click", () => closeLgAlert());
+            actions.append(goButton, confirm);
+            overlay.style.display = "flex";
         }
 
         function closeLgAlert(event) {
@@ -4694,26 +4917,185 @@
 
         let activeQuickViewTab = 'html';
         let currentQuickViewDoc = null;
+        let compareCurrentPage = 1;
+        let compareTotalPages = 1;
+        let compareZoomScale = 1.0;
+        let compareDocPages = {};
 
         function switchQuickViewTab(tab) {
             activeQuickViewTab = tab;
             const htmlTabBtn = document.getElementById("tabBtnHtml");
             const mdTabBtn = document.getElementById("tabBtnMarkdown");
+            const cmpTabBtn = document.getElementById("tabBtnCompare");
             const htmlPane = document.getElementById("quickViewHtmlPane");
             const mdPane = document.getElementById("quickViewMarkdownPane");
+            const cmpPane = document.getElementById("quickViewComparePane");
+            const modalEl = document.querySelector(".quick-view-modal");
             const copyBtnText = document.getElementById("copyBtnText");
+            const markerTrack = document.getElementById("scrollbarMarkerTrack");
+
             if (copyBtnText) copyBtnText.textContent = tab === 'markdown' ? "Chép Markdown" : "Sao chép";
 
             if (tab === 'html') {
                 if (htmlTabBtn) htmlTabBtn.classList.add("active");
                 if (mdTabBtn) mdTabBtn.classList.remove("active");
+                if (cmpTabBtn) cmpTabBtn.classList.remove("active");
                 if (htmlPane) htmlPane.style.display = "block";
                 if (mdPane) mdPane.style.display = "none";
-            } else {
+                if (cmpPane) cmpPane.style.display = "none";
+                if (modalEl) modalEl.classList.remove("compare-mode");
+                if (markerTrack) markerTrack.style.display = "block";
+            } else if (tab === 'markdown') {
                 if (htmlTabBtn) htmlTabBtn.classList.remove("active");
                 if (mdTabBtn) mdTabBtn.classList.add("active");
+                if (cmpTabBtn) cmpTabBtn.classList.remove("active");
                 if (htmlPane) htmlPane.style.display = "none";
                 if (mdPane) mdPane.style.display = "block";
+                if (cmpPane) cmpPane.style.display = "none";
+                if (modalEl) modalEl.classList.remove("compare-mode");
+                if (markerTrack) markerTrack.style.display = "none";
+            } else if (tab === 'compare') {
+                if (htmlTabBtn) htmlTabBtn.classList.remove("active");
+                if (mdTabBtn) mdTabBtn.classList.remove("active");
+                if (cmpTabBtn) cmpTabBtn.classList.add("active");
+                if (htmlPane) htmlPane.style.display = "none";
+                if (mdPane) mdPane.style.display = "none";
+                if (cmpPane) cmpPane.style.display = "flex";
+                if (modalEl) modalEl.classList.add("compare-mode");
+                if (markerTrack) markerTrack.style.display = "none";
+                initCompareMode();
+            }
+        }
+
+        function initCompareMode() {
+            if (!currentQuickViewDoc) return;
+            compareCurrentPage = 1;
+            compareZoomScale = 1.0;
+            resetCompareZoom();
+            parseDocPages(currentQuickViewDoc.content || "");
+            loadComparePage(compareCurrentPage);
+        }
+
+        function parseDocPages(content) {
+            compareDocPages = {};
+            if (!content) return;
+            const regex = /<!--\s*PAGE\s+(\d+)[^>]*-->/gi;
+            let match;
+            const matches = [];
+            while ((match = regex.exec(content)) !== null) {
+                matches.push({ page: parseInt(match[1], 10), index: match.index, length: match[0].length });
+            }
+            if (matches.length === 0) {
+                compareDocPages[1] = content;
+                return;
+            }
+            for (let i = 0; i < matches.length; i++) {
+                const pNum = matches[i].page;
+                const start = matches[i].index + matches[i].length;
+                const end = (i + 1 < matches.length) ? matches[i + 1].index : content.length;
+                compareDocPages[pNum] = content.substring(start, end).trim();
+            }
+        }
+
+        function renderComparePageText(pageNum) {
+            const textPane = document.getElementById("compareTextPane");
+            if (!textPane) return;
+            let rawPageText = compareDocPages[pageNum] || (pageNum === 1 ? (currentQuickViewDoc?.content || "") : "");
+            if (!rawPageText) {
+                textPane.innerHTML = '<div style="color: var(--text-muted); font-style: italic; padding: 20px;">(Không có văn bản bóc tách cho trang này)</div>';
+                return;
+            }
+            const lines = rawPageText.split('\n');
+            let htmlParts = [];
+            lines.forEach(l => {
+                const s = l.trim();
+                if (!s) return;
+                if (s.startsWith('# ')) htmlParts.push(`<h2>${escapeHTML(s.substring(2))}</h2>`);
+                else if (s.startsWith('## ')) htmlParts.push(`<h3>${escapeHTML(s.substring(3))}</h3>`);
+                else if (s.startsWith('### ')) htmlParts.push(`<h4>${escapeHTML(s.substring(4))}</h4>`);
+                else if (s.startsWith('> ')) htmlParts.push(`<blockquote>${escapeHTML(s.substring(2))}</blockquote>`);
+                else htmlParts.push(`<p>${escapeHTML(s)}</p>`);
+            });
+            textPane.innerHTML = htmlParts.join('') || `<p>${escapeHTML(rawPageText)}</p>`;
+
+            if (window.renderMathInElement && textPane) {
+                try {
+                    renderMathInElement(textPane, {
+                        delimiters: [
+                            {left: '$$', right: '$$', display: true},
+                            {left: '$', right: '$', display: false},
+                            {left: '\\(', right: '\\)', display: false},
+                            {left: '\\[', right: '\\]', display: true}
+                        ],
+                        throwOnError: false
+                    });
+                } catch(e) {}
+            }
+        }
+
+        function loadComparePage(pageNum) {
+            if (!currentQuickViewDoc || !currentQuickViewDoc.document_id) return;
+            const imgEl = document.getElementById("compareScanImage");
+            const loadingEl = document.getElementById("compareImageLoading");
+            const labelEl = document.getElementById("comparePageLabel");
+            const prevBtn = document.getElementById("btnComparePrev");
+            const nextBtn = document.getElementById("btnCompareNext");
+
+            if (loadingEl) loadingEl.style.display = "block";
+            renderComparePageText(pageNum);
+
+            if (window.pywebview && window.pywebview.api && window.pywebview.api.get_page_preview_image) {
+                window.pywebview.api.get_page_preview_image(currentQuickViewDoc.document_id, pageNum)
+                    .then(function(res) {
+                        if (loadingEl) loadingEl.style.display = "none";
+                        if (res && res.success && res.image_base64) {
+                            compareCurrentPage = res.current_page || pageNum;
+                            compareTotalPages = res.total_pages || 1;
+                            if (imgEl) {
+                                imgEl.src = `data:${res.mime_type || 'image/jpeg'};base64,${res.image_base64}`;
+                                imgEl.style.display = "block";
+                            }
+                            if (labelEl) labelEl.textContent = `Trang ${compareCurrentPage} / ${compareTotalPages}`;
+                            if (prevBtn) prevBtn.disabled = (compareCurrentPage <= 1);
+                            if (nextBtn) nextBtn.disabled = (compareCurrentPage >= compareTotalPages);
+                        } else {
+                            if (imgEl) imgEl.style.display = "none";
+                            if (labelEl) labelEl.textContent = (res && res.error) ? res.error : "Không thể tải ảnh scan";
+                        }
+                    })
+                    .catch(function(err) {
+                        if (loadingEl) loadingEl.style.display = "none";
+                        if (imgEl) imgEl.style.display = "none";
+                        if (labelEl) labelEl.textContent = "Lỗi kết nối: " + err;
+                    });
+            } else {
+                if (loadingEl) loadingEl.style.display = "none";
+                if (labelEl) labelEl.textContent = "Chế độ đối chiếu 1:1 hoạt động trong ứng dụng Desktop.";
+            }
+        }
+
+        function changeComparePage(delta) {
+            const target = compareCurrentPage + delta;
+            if (target < 1 || target > compareTotalPages) return;
+            compareCurrentPage = target;
+            loadComparePage(compareCurrentPage);
+        }
+
+        function zoomCompareImage(factor) {
+            compareZoomScale = Math.max(0.4, Math.min(3.0, compareZoomScale * factor));
+            const imgEl = document.getElementById("compareScanImage");
+            if (imgEl) {
+                imgEl.style.transform = `scale(${compareZoomScale})`;
+                imgEl.style.transformOrigin = "top center";
+            }
+        }
+
+        function resetCompareZoom() {
+            compareZoomScale = 1.0;
+            const imgEl = document.getElementById("compareScanImage");
+            if (imgEl) {
+                imgEl.style.transform = "scale(1.0)";
+                imgEl.style.transformOrigin = "top center";
             }
         }
 
@@ -4737,6 +5119,37 @@
             } else {
                 onCopied();
             }
+        }
+
+        function exportQuickView(format) {
+            if (!currentQuickViewDoc || !currentQuickViewDoc.document_id) {
+                if (typeof showLgAlert === 'function') {
+                    showLgAlert("Không tìm thấy thông tin tài liệu để xuất.", "Lỗi");
+                } else {
+                    alert("Không tìm thấy thông tin tài liệu để xuất.");
+                }
+                return;
+            }
+            if (!window.pywebview || !window.pywebview.api || !window.pywebview.api.export_document) {
+                const msg = "Bản SuperSearch.exe hiện tại chưa hỗ trợ xuất. Vui lòng build/cập nhật bản mới.";
+                if (typeof showLgAlert === 'function') showLgAlert(msg, "Lỗi");
+                else alert(msg);
+                return;
+            }
+            window.pywebview.api.export_document(currentQuickViewDoc.document_id, format).then(res => {
+                if (res && res.success) {
+                    if (typeof showExportSuccessDialog === 'function') showExportSuccessDialog(res, format);
+                    else alert(`Đã xuất tệp thành công!\nTên tệp: ${res.filename}\nĐường dẫn:\n${res.path}`);
+                } else {
+                    const errMsg = (res && res.error) || "Không thể xuất tệp.";
+                    if (typeof showLgAlert === 'function') showLgAlert(errMsg, "Lỗi xuất tệp");
+                    else alert(errMsg);
+                }
+            }).catch(err => {
+                const errMsg = "Lỗi khi gọi xuất tệp: " + String(err);
+                if (typeof showLgAlert === 'function') showLgAlert(errMsg, "Lỗi xuất tệp");
+                else alert(errMsg);
+            });
         }
 
         function renderQuickViewDocument(doc) {
@@ -4781,14 +5194,34 @@
             if (htmlPane) htmlPane.innerHTML = tempDiv.innerHTML;
             if (mdCode) mdCode.textContent = displayContent;
 
+            // Kiểm tra định dạng hỗ trợ chế độ đối chiếu 1:1 (PDF và Hình ảnh scan)
+            const tabBtnCompare = document.getElementById("tabBtnCompare");
+            const docExt = (documentPath.split('.').pop() || '').toLowerCase();
+            const isCompareSupported = ['pdf', 'png', 'jpg', 'jpeg', 'bmp', 'tiff', 'tif', 'webp'].includes(docExt);
+            if (tabBtnCompare) {
+                tabBtnCompare.style.display = isCompareSupported ? "inline-flex" : "none";
+            }
+
             // Luôn mặc định mở tab HTML theo yêu cầu
             switchQuickViewTab('html');
             overlay.style.display = "flex";
             document.body.style.overflow = "hidden"; // Prevent scrolling body
 
-            // Kích hoạt MathJax typeset cho tab HTML nếu có công thức
-            if (window.MathJax && window.MathJax.typesetPromise && htmlPane) {
-                try { window.MathJax.typesetPromise([htmlPane]); } catch(e) {}
+            // Kích hoạt KaTeX offline typeset cho tab HTML nếu có công thức
+            if (window.renderMathInElement && htmlPane) {
+                try {
+                    renderMathInElement(htmlPane, {
+                        delimiters: [
+                            {left: '$$', right: '$$', display: true},
+                            {left: '$', right: '$', display: false},
+                            {left: '\\(', right: '\\)', display: false},
+                            {left: '\\[', right: '\\]', display: true}
+                        ],
+                        throwOnError: false
+                    });
+                } catch(e) {
+                    console.warn("KaTeX render error:", e);
+                }
             }
 
             // Tạo các vạch định vị highlight trên scrollbar

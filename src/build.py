@@ -10,6 +10,12 @@ BUILD_INPUTS = (
     "index_store.py",
     "gemini_ocr_engine.py",
     "html_builder.py",
+    "export_service.py",
+    "folder_watchdog.py",
+    "core_utils.py",
+    "converters.py",
+    "file_classifier.py",
+    "ocr_postprocessor.py",
     "SuperSearch.spec",
     "LogoSS256.ico",
 )

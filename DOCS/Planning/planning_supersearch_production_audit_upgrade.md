@@ -1,171 +1,181 @@
 ---
-title: "Kế hoạch Audit Toàn diện và Nâng cấp SuperSearch Đạt Chuẩn Production (v2)"
-version: v2
-status: plan_continuation
+title: "Kế hoạch Audit Toàn diện và Nâng cấp SuperSearch Đạt Chuẩn Production (v6)"
+version: v6
+status: completed
 task: audit_and_production_upgrade
 created: 2026-09-10
-updated: 2026-09-10
+updated: 2026-09-12
 author: Antigravity
 ---
 
-# Kế Hoạch Audit Toàn Diện và Nâng Cấp Hệ Thống SuperSearch (Production-Ready) - v2
+# Kế Hoạch Audit Toàn Diện và Nâng Cấp Hệ Thống SuperSearch (Production-Ready) - v6
 
 ## 1. Mục tiêu (Objective)
-- Thực hiện kiểm toán toàn diện (Code Audit & Architecture Audit) hệ thống SuperSearch.
-- Định danh và phân loại tất cả các nợ kỹ thuật (Technical Debt), lỗ hổng thuật toán, tắc nghẽn hiệu năng (Performance Bottlenecks), và các thiết kế chưa chuẩn mực.
-- Thiết lập lộ trình tái cấu trúc và nâng cấp toàn diện để đưa SuperSearch trở thành phần mềm tìm kiếm offline chuyên nghiệp, đạt tiêu chuẩn production, giao diện trực quan, thân thiện và có tính ứng dụng thực tiễn cao cho mọi tổ chức.
+- Thực hiện kiểm toán toàn diện Vòng 2 (Deep Code Audit, Architecture & Scale Audit) hệ thống SuperSearch.
+- Định danh và phân loại sâu các rủi ro kỹ thuật khi hệ thống vận hành thực tế ở quy mô lớn (hàng chục nghìn tệp, đa dạng định dạng phức tạp, tệp dung lượng lớn).
+- Phân tích các góc nhìn kỹ sư chuyên sâu và các điểm mù phi kỹ thuật mà người quản lý có thể bỏ qua.
+- Thiết lập lộ trình triển khai chi tiết các tấm chắn bảo vệ (Safety Rails), tái cấu trúc module và tối ưu hiệu năng đạt chuẩn phần mềm thương mại ổn định cao.
 
 ---
 
 ## 2. Báo Cáo Kiểm Toán Toàn Diện (Comprehensive Audit Findings)
 
 ### 2.1. Nợ kỹ thuật kiến trúc (Architecture Debts)
-1. **Monolithic God Class (`src/app.py` > 1.800 dòng, `Api` class > 1.240 dòng)**:
-   - Class `Api` kiêm nhiệm quá nhiều trách nhiệm: Cầu nối GUI PyWebView, quản lý vòng đời luồng, điều phối bộ chuyển đổi MarkItDown, duyệt thư mục, phân loại nghiệp vụ, bóc tách metadata, ghi cache file, cấu hình OCR, mở Explorer.
+1. **Monolithic God Class (`src/app.py` > 2.200 dòng, `Api` class > 1.450 dòng)**:
+   - Class `Api` kiêm nhiệm quá nhiều trách nhiệm: Cầu nối GUI PyWebView, quản lý vòng đời luồng, điều phối bộ chuyển đổi MarkItDown, duyệt thư mục, phân loại nghiệp vụ, bóc tách metadata, ghi cache file, cấu hình OCR, điều khiển Watchdog, xuất file Word/Markdown.
    - Vi phạm nghiêm trọng nguyên lý Single Responsibility Principle (SRP).
-2. **Monolithic Frontend (`data/SuperSearch.html` 228 KB, 5.382 dòng)**:
-   - Chứa 2.137 dòng CSS nội tuyến, 310 dòng HTML, và 2.902 dòng JavaScript không phân tách module trong một file duy nhất.
-   - Rất khó debug, kiểm thử unit test cho UI, mở rộng hay tái sử dụng các thành phần giao diện.
-3. **Phế tích dư thừa `search_db.js` (Legacy Dead Weight)**:
-   - Trong mỗi chu kỳ quét tài liệu, `app.py` biên dịch toàn bộ dữ liệu văn bản của tất cả các file thành một biến JavaScript `var SEARCH_DB = [...]` rồi ghi ra đĩa với `indent=2`.
-   - Trong khi đó, giao diện người dùng hiện tại đã chuyển sang truy vấn trực tiếp SQLite FTS5 qua `pywebview.api.search_documents`.
-   - Hậu quả: Gây bùng nổ RAM (nguy cơ OOM khi thư mục có hàng vạn tệp), nhân đôi dung lượng lưu trữ đĩa vô ích và làm chậm pha kết thúc quét hàng chục lần.
-4. **Viết thừa hàng nghìn tệp HTML mồ côi (`runtime/HTML/`)**:
-   - `scan_and_index` tạo ra toàn bộ cây thư mục HTML trong `runtime/HTML/` bằng `_write_html`, nhưng phương thức `get_document` khi preview lại gọi `markdown_to_html_body` trực tiếp từ văn bản thô. Không có bất kỳ thành phần nào đọc cây thư mục HTML này.
+2. **Monolithic Frontend (`data/SuperSearch.html` > 5.400 dòng)**:
+   - Chứa hơn 2.100 dòng CSS nội tuyến, 310 dòng HTML, và gần 3.000 dòng JavaScript không phân tách module trong một file duy nhất.
+   - Chứa hơn 1.500 dòng code JavaScript di sản tính toán BM25 và tạo inverted index in-memory (`SEARCH_DB`, `buildSearchIndex`, `searchDatabase`) từ phiên bản cũ không còn sử dụng trong PyWebView mode.
+3. **Sự gắn kết chặt chẽ (Tight Coupling) giữa các Converter và Api**:
+   - `LocalOcrPdfConverter`, `LocalOcrImageConverter`, `LocalDocConverter`, `LocalXlsConverter`, `SafeZipConverter` nằm chung trong file `app.py`.
+   - Các converter truy cập trực tiếp các biến thành viên của `Api` thay vì sử dụng cơ chế Dependency Injection độc lập.
 
-### 2.2. Vấn đề thuật toán & Hiệu năng (Algorithms & Performance)
-1. **Xóa trắng và tái tạo Index toàn phần (Lack of Incremental Indexing)**:
-   - Trong `src/index_store.py`, phương thức `replace_entries` thực thi:
-     `DELETE FROM documents_fts; DELETE FROM documents;` rồi chèn lại toàn bộ tài liệu từ đầu và gọi `INSERT INTO documents_fts(documents_fts) VALUES ('rebuild')`.
-   - Khi thư mục có 50.000 tệp, việc thêm mới hoặc sửa 1 tệp duy nhất buộc hệ thống phải xóa và lập chỉ mục lại toàn bộ 50.000 tệp. Độ phức tạp là $O(N)$ thay vì $O(\Delta)$.
-2. **Nhân đôi dung lượng cơ sở dữ liệu (Redundant Column Storage)**:
-   - Bảng `documents` lưu trữ cả `content` (gốc) lẫn `content_clean` (đã bỏ dấu tiếng Việt).
-   - Trong khi đó, bảng ảo FTS5 đã sử dụng tokenizer `unicode61 remove_diacritics 2`. Cột `content_clean` hoàn toàn không bao giờ được truy vấn trả về cho người dùng, làm tăng 100% dung lượng lưu trữ text trong SQLite.
-3. **Tắc nghẽn tạo Snippet bằng Python thuần (Snippet Generation Bottleneck)**:
-   - Hàm `build_plain_snippet` trong `index_store.py` duyệt từng ký tự bằng `unicodedata.normalize('NFD', char)` và xây dựng mảng offset ký tự trên RAM. Với các tệp dung lượng lớn, thao tác này làm chậm tiến trình tìm kiếm một cách nghiêm trọng. Trong khi SQLite FTS5 có sẵn hàm `snippet()` ở tầng C siêu tốc.
-4. **Lãng phí truy vấn đa lần trong Search RRF**:
-   - Mỗi truy vấn từ 2 từ trở lên thực thi 4-5 câu lệnh SQL FTS riêng biệt (`title_phrase`, `phrase`, `near`, `strict`, `relaxed`), mỗi câu lệnh lấy tới 2.000 bản ghi với 19 trường dữ liệu, sau đó tải vào Python để gộp và sắp xếp trên bộ nhớ.
-5. **Render ảnh PDF hai lần trong OCR (Double Rendering in OCR)**:
-   - Trong `LocalOcrPdfConverter`, khi trang PDF cần OCR, code gọi `page.to_image(resolution=150)` và encode PNG để gửi sang Gemini. Nếu Gemini lỗi hoặc fallback sang Tesseract, hệ thống lại gọi lại `page.to_image(resolution=150)` lần thứ hai để nạp vào pytesseract, tiêu tốn gấp đôi CPU và bộ nhớ đồ họa.
-6. **Điều phối đa luồng tĩnh và cơ chế thắt nghẽn 1 luồng cứng (Static Worker Lock & Hard Choke)**:
-   - `get_safe_workers_count()` chỉ đo RAM một lần duy nhất lúc khởi động quét. Nếu RAM > 70%, hệ thống khóa cứng vĩnh viễn 1 luồng cho toàn bộ phiên quét, gây lãng phí thời gian quét lên đến hàng chục lần. Nếu ban đầu RAM thấp rồi tăng cao trong quá trình quét file nặng, hệ thống lại không có cơ chế tự động giảm luồng mềm.
-7. **Dung lượng đệm ảnh OCR thô (Uncompressed Raw Image Buffers)**:
-   - Bộ đệm OCR lưu ảnh định dạng PNG thô (~3-5MB/trang), gây lãng phí RAM đệm và làm chậm băng thông gửi payload lên Gemini API gấp 5-10 lần so với JPEG tối ưu.
+### 2.2. Kiểm Toán Vòng 2: Trả lời 4 Câu hỏi Cốt lõi của Chuyên gia
 
-### 2.3. Lỗi phần mềm nghiêm trọng & Ràng buộc cứng (Critical Bugs & Hardcoding)
-1. **Chuẩn hóa định danh mô hình Gemini API**:
-   - `DEFAULT_GEMINI_MODEL = "gemini-3.6-flash"` trong `gemini_ocr_engine.py` và `app.py`.
-   - Mô hình `gemini-3.6-flash` là model khuyến nghị chính thức mới nhất của Google Generative AI API (thay thế gemini-2.5-flash). Hệ thống hỗ trợ dự phòng `gemini-2.5-pro`, `gemini-2.0-flash`, `gemini-1.5-flash`.
-2. **Hard-coded nghiệp vụ đặc thù doanh nghiệp CICT**:
-   - Mã nguồn chứa cứng các chuỗi nhận diện riêng của Cảng Cái Lân (`cict administration documents`, `cict.qt.it`, `cict.cs.it`, `sà lan`, `cảng vụ`, `nạo vét bến cảng`, `cai lan terminal`).
-   - Tiêu đề giao diện bị gán cứng: `SuperSearch - Tra cứu tài liệu siêu tốc CICT`.
-   - Phần mềm bị mất tính tổng quát, không thể phân phối cho các cá nhân hoặc tổ chức khác.
-3. **Vi phạm nguyên tắc Local-First & Hoạt động Ngoại tuyến (Offline Breakdown)**:
-   - Sử dụng CDN ngoài cho MathJax: `https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js`.
-   - Sử dụng Google Fonts: `https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro...`.
-   - Khi chạy trên máy trạm nội bộ không có Internet hoặc mạng cách ly bảo mật (air-gapped), giao diện sẽ bị treo/chờ timeout mạng, font bị giật (FOIT), và công thức toán không thể render.
-4. **Rủi ro chuỗi lệnh khi mở File Explorer**:
-   - Hàm `open_explorer` ghép chuỗi `subprocess.Popen(f'explorer.exe /select,"{resolved}"')`. Cần chuẩn hóa thành danh sách đối số an toàn để chống lỗi ký tự đặc biệt hoặc khoảng trắng.
+#### 2.2.1. Những điểm có khả năng cao đang phát sinh nợ kỹ thuật?
+- **Khối xử lý `src/app.py` nguyên khối**: Mỗi khi cần thêm định dạng mới, thay đổi logic OCR hay sửa giao diện, lập trình viên đều phải sửa trực tiếp trên file này, nguy cơ sinh regression bug cực cao.
+- **Trạng thái tiến trình quét (Scan State) hoàn toàn nằm trên RAM**: Hàng đợi tác vụ `tasks = []` và tiến độ `active_files` không được lưu bền vững (không có SQLite task queue). Nếu phần mềm bị tắt ngang giữa lúc quét 50.000 file, toàn bộ tiến trình dở dang bị hủy, lần sau phải quét lại từ đầu.
+- **Frontend thiếu module hóa**: Việc quản lý trạng thái UI, phím tắt, rendering danh sách kết quả, và Preview viewer đều nằm trong các hàm JavaScript toàn cục đan xen, không thể viết Unit Test tự động cho UI.
 
----
+#### 2.2.2. Rủi ro khi hệ thống xử lý nhiều file, nhiều dạng file, file dung lượng lớn cùng lúc?
+- **Hiện tượng nghẽn cổ chai Python GIL (Global Interpreter Lock)**:
+  - Python `ThreadPoolExecutor` bị giới hạn bởi GIL. Các tác vụ tiêu tốn CPU cao như bóc tách PDF phức tạp (`pdfminer`), render trang ảnh PDF (`page.to_image`), OCR tesseract, hay parse bảng tính Excel khổng lồ (`openpyxl`) thực chất chỉ chạy trên 1 lõi CPU duy nhất. Khi tăng số luồng, hiện tượng tranh chấp GIL (thread thrashing) làm chậm hệ thống.
+- **Phân mảnh và rò rỉ bộ nhớ (Memory Heap Fragmentation) từ thư viện C**:
+  - Các thư viện C bên dưới như `pdfminer.six` và `PIL` khi giải mã các file PDF vector nặng hoặc ảnh độ phân giải siêu cao (300-600 DPI) có thể giữ lại bộ nhớ đệm C-heap mà `gc.collect()` của Python không lập tức trả lại cho hệ điều hành.
+  - File Excel dung lượng lớn (hàng trăm nghìn dòng): `openpyxl` / `pandas` đọc toàn bộ file vào RAM, có thể ngốn 2GB - 4GB RAM chỉ với 1 file duy nhất.
+- **Nguy cơ kẹt luồng vĩnh viễn do thiếu Task Timeout**:
+  - Hệ thống hiện tại không có cơ chế Timeout cho từng file riêng lẻ. Nếu gặp file PDF hỏng cấu trúc khiến bộ giải mã rơi vào vòng lặp vô tận (infinite loop), hoặc 1 file văn bản kích hoạt lỗi catastrophic backtracking trong Regex, luồng worker đó sẽ bị "đóng băng" vĩnh viễn, làm giảm dần số worker khả dụng cho đến khi việc quét bị đình trệ.
+- **Nguy cơ tràn bộ đệm sự kiện của Watchdog (`ERROR_NOTIFY_ENUM_DIR`)**:
+  - Khi người dùng giải nén hoặc copy một cây thư mục chứa 20.000 file vào thư mục theo dõi trong tích tắc, bộ đệm 64KB của `ReadDirectoryChangesW` sẽ bị tràn. Nếu không có cơ chế phát hiện tràn để tự động quét bù (re-scan), hàng nghìn file mới sẽ bị bỏ sót.
 
-## 3. Đề Xuất Nâng Cấp Hệ Thống (Production-Grade Architecture Proposal)
+#### 2.2.3. Nếu một kỹ sư phần mềm thực sự nhìn vào dự án, họ sẽ lo ngại điều gì đầu tiên?
+- **Thiếu cơ chế cách ly tiến trình (No Process Sandboxing / Crash Resilience)**:
+  - Đây là mối lo lớn nhất. Các bộ bóc tách file nhị phân (`pdfplumber`, `lxml`, `olefile`, `pytesseract`) viết bằng C/C++. Nếu gặp 1 file hỏng hoặc chứa mã độc gây lỗi Segmentation Fault / Access Violation, **toàn bộ tiến trình Python (bao gồm cả cửa sổ giao diện PyWebView) sẽ biến mất lập tức** mà không có bất kỳ thông báo lỗi hay cơ hội cứu vãn dữ liệu nào.
+  - Các hệ thống tìm kiếm chuẩn enterprise đều cô lập worker parse file sang Subprocess riêng biệt.
+- **Khả năng gây đơ giao diện PyWebView (Synchronous Bridge Blocking)**:
+  - Các lệnh gọi từ JavaScript sang Python qua `pywebview.api` nếu xử lý các tác vụ I/O nặng (như parse file lớn hoặc tìm kiếm nặng) trên cùng luồng bridge sẽ khiến cửa sổ UI bị "Not Responding" và quay chuột.
 
-### 3.1. Tái cấu trúc mã nguồn Backend theo Clean Modular Architecture
-Tách nhỏ `src/app.py` thành các module độc lập theo miền trách nhiệm:
-- `src/core/`: Quản lý cấu hình, hằng số, logger, xác định đường dẫn môi trường (frozen vs dev).
-- `src/converters/`:
-  - `base.py`: Lớp trừu tượng DocumentConverter chuẩn.
-  - `pdf_converter.py`: Bóc tách PDF + OCR bộ đệm 1 lần (Single-pass render).
-  - `office_converters.py`: Chuyển đổi Word, Excel, PowerPoint.
-  - `image_converter.py`: OCR ảnh.
-  - `archive_converter.py`: Xử lý ZIP an toàn.
-- `src/storage/`:
-  - `index_store.py`: Cơ sở dữ liệu SQLite FTS5 nâng cấp hỗ trợ **Incremental Upsert/Delete**.
-- `src/services/`:
-  - `indexer_service.py`: Quét thư mục, quản lý đa luồng, báo cáo tiến độ, đồng bộ hóa chỉ mục.
-  - `classifier_service.py`: Bộ phân loại tài liệu tổng quát (Generic classifier), cho phép cấu hình theo file rule JSON ngoài.
-  - `ocr_service.py`: Quản lý bộ máy OCR (Tesseract nội bộ + Gemini AI chuẩn model).
-- `src/ui_bridge/`:
-  - `api.py`: Chỉ đóng vai trò API Controller mỏng, nhận request từ PyWebView và chuyển tiếp xuống service.
-
-### 3.2. Nâng cấp Thuật toán & Tối ưu Cơ sở dữ liệu SQLite FTS5
-1. **Incremental Indexing (Chỉ mục gia tăng)**:
-   - Bổ sung bảng theo dõi phiên bản tệp dựa trên `absolute_original_path`, `source_mtime_ns`, và `source_size`.
-   - Khi quét lại:
-     - Tệp mới: INSERT vào `documents` và `documents_fts`.
-     - Tệp sửa đổi: UPDATE vào `documents` và `documents_fts`.
-     - Tệp đã xóa: DELETE khỏi `documents` và `documents_fts`.
-     - Tệp không đổi: Bỏ qua hoàn toàn.
-2. **Loại bỏ dữ liệu rác**:
-   - Xóa bỏ việc tạo và ghi `search_db.js`.
-   - Xóa bỏ việc ghi cây thư mục tĩnh `runtime/HTML/`.
-   - Loại bỏ cột `content_clean` khỏi bảng `documents`, dựa vào khả năng xử lý dấu tự nhiên của SQLite FTS5 `tokenize='unicode61 remove_diacritics 2'`.
-3. **Chuyển dịch tạo Snippet sang C Native**:
-   - Tận dụng hàm `snippet(documents_fts, ...)` của SQLite để trích xuất ngữ cảnh khớp từ khóa siêu tốc, giảm tải tối đa cho Python.
-4. **Bộ điều tiết luồng thích ứng (Adaptive Dynamic Throttling) & Trần an toàn 75%**:
-   - Bỏ cơ chế đo RAM 1 lần duy nhất lúc khởi tạo; chuyển sang kiểm tra tải hệ thống động theo chu kỳ và theo ngưỡng task.
-   - **Mức xanh (< 65% RAM/CPU)**: Hoạt động 100% công suất đa luồng tối đa (`N_workers = int(cpu_cores * 0.75)`).
-   - **Mức vàng (65% - 75% RAM/CPU)**: Giảm mềm luồng xuống mức an toàn (`max(2, int(N_workers * 0.65))`), ngăn chặn hiện tượng tăng vọt đột ngột.
-   - **Mức đỏ (> 75% RAM/CPU)**: Chế độ phòng vệ khẩn cấp, duy trì tối thiểu 2 luồng (chỉ hạ về 1 luồng nếu RAM > 88%), tự động gọi `gc.collect()` và tạo quãng nghỉ 0.5s để bộ đệm RAM hạ nhiệt.
-   - **Độ trễ phục hồi (Hysteresis)**: Chỉ cho phép tăng lại số luồng khi tài nguyên hạ ổn định dưới 60% qua 2 chu kỳ đo liên tiếp nhằm triệt tiêu dao động gián đoạn (oscillation).
-   - **Tối ưu đệm ảnh OCR**: Thay thế hoàn toàn việc lưu ảnh PNG thô bằng JPEG chất lượng 85%. Tiết kiệm 90% bộ nhớ RAM đệm và tăng tốc truyền tải HTTP cho Gemini API gấp 5-10 lần.
-   - **Cách ly Semaphore Tesseract**: Thay thế lock toàn cục duy nhất bằng `BoundedSemaphore` cho phép xử lý song song có kiểm soát mà không gây quá tải CPU.
-
-### 3.3. Tách biệt và Nâng cấp Frontend (UX/UI Hiện Đại)
-1. **Phân rã Frontend**:
-   - Tách `SuperSearch.html` thành các file độc lập: `index.html`, `styles/` (chứa design system, glassmorphic tokens), `scripts/` (quản lý state, pywebview bridge, event handlers).
-2. **Đóng gói Offline 100% (Air-gapped Ready)**:
-   - Nhúng font chuẩn hệ thống (`Segoe UI`, `Inter` fallback) không phụ thuộc Google Fonts.
-   - Thay thế MathJax CDN bằng thư viện KaTeX / MathJax bundle cục bộ tải trực tiếp từ máy tính.
-3. **Cải thiện trải nghiệm người dùng (UX Enhancements)**:
-   - **Thanh tiến trình quét thông minh**: Hiển thị tốc độ quét (file/s), số file còn lại, thanh ước lượng thời gian (ETA), và danh sách các file đang được xử lý song song trực quan.
-   - **Bảng quản lý lỗi quét (Error Inspector)**: Modal xem chi tiết các file không đọc được, có nút bấm "Thử lại (Retry)" hoặc "Xem file trong Explorer".
-   - **Bộ lọc tìm kiếm trực quan**: Thêm thanh trượt/chọn khoảng thời gian (Date Range Picker), lọc nhanh theo loại định dạng (PDF, Word, Excel, Ảnh, v.v.), gắn tag phân loại mềm.
-   - **Trình xem trước tài liệu (Preview Viewer) nâng cấp**: Hỗ trợ tìm kiếm từ khóa bên trong tài liệu đang xem (In-document search), nút phóng to/thu nhỏ font, chế độ đọc tập trung (Focus mode), và copy nhanh nội dung Markdown.
-   - **Trung tâm cài đặt (Settings Center)**: Cho phép người dùng trực tiếp nhập và kiểm tra API Key Gemini, chọn mô hình (`gemini-2.5-flash`, `gemini-1.5-flash`), cấu hình số lượng worker luồng tối đa, và tùy chỉnh thư mục quét mặc định.
+#### 2.2.4. Có điểm nào người dùng không có nền tảng kỹ thuật thường bỏ qua?
+1. **Giới hạn độ dài đường dẫn Windows 260 ký tự (`MAX_PATH`)**:
+   - Trong môi trường doanh nghiệp, thư mục thường lồng nhau rất sâu: `Du_an_2026/Hop_dong/Khach_hang_A/Phu_luc/Bien_ban_nghiem_thu_ban_giao_giai_doan_1_ban_ky_chinh_thuc.pdf`.
+   - Windows mặc định giới hạn đường dẫn 260 ký tự. Khi vượt quá, Python sẽ báo lỗi `FileNotFoundError` dù file vẫn tồn tại. Cần tiền tố `\\?\` để vượt qua giới hạn này.
+2. **Xung đột khóa file độc quyền trên Windows (`Sharing Violation WinError 32`)**:
+   - Khi một nhân viên đang mở file Word/Excel để soạn thảo, hoặc Windows Defender đang quét virus cho file, Windows cấm các tiến trình khác đọc file.
+   - Nếu không có cơ chế tự động thử lại (Retry with Backoff), SuperSearch sẽ bỏ qua file này và không bao giờ lập chỉ mục nội dung của nó.
+3. **Mã hóa tên tệp trong file nén ZIP cũ (Mojibake Codepage 437 / CP1258)**:
+   - Các file ZIP nén từ máy tính Windows cũ không dùng UTF-8 mà dùng CP437 hoặc CP1258. Tên file tiếng Việt khi giải nén bị biến dạng thành ký tự vô nghĩa.
+4. **Cạn kiệt dung lượng ổ đĩa ngầm (`runtime/` Disk Exhaustion)**:
+   - Khi quét kho 200GB tài liệu, thư mục Markdown và SQLite FTS5 có thể phình to 20GB - 30GB. Nếu ổ cứng chỉ còn 1GB trống, hệ điều hành sẽ crash SQLite. Cần cơ chế tiền kiểm tra dung lượng ổ đĩa (Pre-flight disk check).
+5. **Tiêu hao pin và nóng máy trên Laptop (Battery Drain)**:
+   - Quét nền liên tục bằng Watchdog có thể vắt kiệt pin laptop trong 30 phút. Cần nhận biết trạng thái cắm sạc (AC power) hay dùng pin (Battery) để tự động hạ tải.
 
 ---
 
-## 4. Kế Hoạch Triển Khai Theo Giai Đoạn (Phased Implementation Roadmap)
+## 3. Kế Hoạch Triển Khai Nâng Cấp Toàn Diện (Upgraded Roadmap)
 
-### Giai đoạn 1: Khắc phục lỗi chí mạng & Loại bỏ nợ thừa (Quick Wins & Stability)
-- [x] **Chuẩn hóa Model Gemini**: Cấu hình `DEFAULT_GEMINI_MODEL` là `gemini-3.6-flash` và hỗ trợ dự phòng `gemini-2.5-pro` / `gemini-2.0-flash` / `gemini-1.5-flash`.
-- [x] **Bẻ khóa Offline**: Gỡ bỏ các liên kết CDN ngoài (Google Fonts, MathJax CDN) trong `SuperSearch.html` và `html_builder.py`; chuẩn hóa font hệ thống và Math offline.
-- [x] **Xóa rác I/O**: Loại bỏ logic ghi `search_db.js` và cây thư mục thừa `runtime/HTML/` trong `scan_and_index`.
-- [x] **Tổng quát hóa nghiệp vụ**: Loại bỏ hardcode thương hiệu CICT, xây dựng cấu hình phân loại linh hoạt hoặc nhận diện tự nhiên.
-- [x] **An toàn hệ thống**: Chuẩn hóa lệnh gọi `open_explorer` sang argument list an toàn.
+### Giai đoạn 1 & 2: Đã hoàn thành và nghiệm thu (Completed Milestones)
+- [x] **Safe Chunking PDF**: Phân trang theo lô 10 trang, giải phóng buffer, gọi `gc.collect()` chống tràn RAM.
+- [x] **Quota Manager Gemini OCR**: Bộ điều tiết hạn ngạch API, lùi nhịp lũy thừa (exponential backoff) khi gặp HTTP 429, tự động chuyển fallback Tesseract.
+- [x] **KaTeX Cục Bộ 100% Offline**: Tích hợp KaTeX nội bộ (`data/vendor/katex/`), loại bỏ hoàn toàn MathJax CDN.
+- [x] **Xuất DOCX & Markdown**: Tạo module `src/export_service.py` hỗ trợ xuất tài liệu chuẩn hóa sang Word và Markdown.
+- [x] **Trọng số BM25 đa tầng**: Schema SQLite FTS5 3 cột (`title_clean`: 10.0, `headings_clean`: 5.0, `content_clean`: 1.0) ưu tiên tiêu đề và tiêu đề mục.
+- [x] **Folder Watchdog nền Windows**: Xây dựng `src/folder_watchdog.py` giám sát thay đổi file thời gian thực bằng `ReadDirectoryChangesW`.
+- [x] **Vá Lỗi 1**: Sửa `self._convert_document_to_markdown` thành `self.convert_file_to_markdown` trong `src/app.py`.
+- [x] **Vá Lỗi 2**: Sửa `IndexStore.sync_entries` với `delete_missing=False` và bổ sung `upsert_entries`.
+- [x] **Vá Lỗi 3**: Bổ sung `IndexStore.delete_entries_by_paths(paths)` và kết nối luồng xóa từ `FolderWatchdog`.
+- [x] **Vá Lỗi 4**: Bọc an toàn chống lỗi cú pháp SQLite FTS5 trong `IndexStore.search_documents` và `_sanitize_fts_expression`.
+- [x] **Tối ưu Thuật toán Snippet**: Tối ưu hóa `build_plain_snippet` trong `src/index_store.py` với fast-path O(1) và cửa sổ 50KB.
+- [x] **Bộ kiểm thử hồi quy 43/43 tests pass 100%**.
 
-### Giai đoạn 2: Tối ưu lõi cơ sở dữ liệu & Thuật toán lập chỉ mục (Core Engine Optimization)
-- [x] **Incremental Indexing**: Xây dựng cơ chế UPSERT/DELETE trong `IndexStore` dựa trên hash và mtime của tệp nguồn.
-- [x] **Tối ưu Schema**: Tự động bảo trì bảng FTS5 qua triggers, loại bỏ rebuild toàn phần.
-- [ ] **Native Snippets**: Thay thế `build_plain_snippet` Python chậm chạp bằng cơ chế tối ưu kết hợp SQLite FTS5 snippet.
-- [x] **Tối ưu hóa OCR**: Khắc phục lỗi render ảnh PDF 2 lần trong `LocalOcrPdfConverter`.
-- [x] **Điều tiết thích ứng 75% & Tối ưu OCR Buffer**: Triển khai bộ điều tiết đa luồng mềm theo trần an toàn 75% RAM/CPU, chống thắt nghẽn 1 luồng cứng, nén đệm JPEG 85% và mở rộng semaphore Tesseract.
+### Giai đoạn 3: Tấm Chắn An Toàn Quy Mô Lớn (Scale, Concurrency & Safety Rails)
+- [x] **Windows Long Path Support (`\\?\`)**:
+  - Hàm `safe_long_path(path)` tự động chuẩn hóa tiền tố `\\?\` khi đường dẫn >= 240 ký tự trên Windows.
+- [x] **Task Timeout chống kẹt Worker**:
+  - Áp dụng `run_with_timeout` (60 giây/file) ngăn chặn vĩnh viễn hiện tượng treo luồng do file hỏng/regex loop.
+- [x] **Bảo vệ Tràn Bộ Đệm Watchdog (Overflow Self-Healing)**:
+  - Bắt mã lỗi `ERROR_NOTIFY_ENUM_DIR` (1002) trong `folder_watchdog.py` và tự động kích hoạt đồng bộ bù.
+- [x] **Cơ chế Thử Lại Khóa File (File Lock Retry with Backoff)**:
+  - Hàm `open_file_with_retry` tự động thử lại 3 lần với backoff lũy thừa khi gặp `PermissionError` (WinError 32).
+- [x] **Tiền Kiểm Tra Dung Lượng Đĩa Trống (Pre-flight Disk Check)**:
+  - Kiểm tra dung lượng đĩa trống trước khi quét, cảnh báo/chặn nếu đĩa dưới 300MB.
+- [x] **Dọn Dẹp File Rác Khởi Động (Startup Scratch Cleanup)**:
+  - Tự động quét và dọn sạch các file tạm `.tmp-*` và thư mục staging mồ côi khi khởi động ứng dụng.
+- [x] **Tối Ưu Hóa SQLite Pragmas Đỉnh Cao**:
+  - Bổ sung `PRAGMA mmap_size = 268435456` (256MB memory mapping), `PRAGMA temp_store = MEMORY`, `PRAGMA synchronous = NORMAL`, `PRAGMA cache_size = -64000` tăng tốc truy vấn FTS5.
+- [x] **Xử Lý Giải Mã Tên Tệp ZIP CP437/CP1258**:
+  - Nhận diện và giải mã an toàn tên tệp ZIP non-UTF-8 sang tiếng Việt chuẩn.
 
-### Giai đoạn 3: Tái cấu trúc Backend & Module hóa (Backend Refactoring)
-- [ ] Tách `src/app.py` thành cấu trúc gói module (`core`, `services`, `converters`, `storage`, `ui_bridge`).
-- [ ] Xây dựng unit tests và integration tests bao phủ các converters và bộ xử lý chỉ mục.
+### Giai đoạn 4: Tái Cấu Trúc Backend Module Hóa & Dọn Dẹp Frontend (Clean Architecture)
+- [x] **Tách `src/core_utils.py`**:
+  - Di chuyển các hàm tiện ích nền: `safe_long_path`, `open_file_with_retry`, `run_with_timeout`, `remove_diacritics`, `MEMORYSTATUSEX`, `get_system_ram_load`, `get_safe_workers_count`, `DynamicWorkerRegulator`, `ConversionPolicyError`, và các hằng số cấu hình.
+- [x] **Tách `src/converters.py`**:
+  - Di chuyển các converter: `SafeZipConverter`, `LocalOcrPdfConverter`, `LocalOcrImageConverter`, `LocalDocConverter`, `LocalXlsConverter`, `configure_tesseract`, `create_markdown_converter`.
+- [x] **Tách `src/file_classifier.py`**:
+  - Di chuyển các hàm phân loại và metadata: `classify_source`, `classify_file`, `detect_domain`, `detect_doc_type`, `detect_language`, `calculate_ocr_quality_score`, `is_ocr_noise`, `clean_content`, `infer_original_ext`, `get_file_creation_parts`.
+- [x] **Thu gọn `src/app.py` thành Thin Controller**:
+  - Class `Api` tinh gọn làm nhiệm vụ điều phối và kết nối PyWebView bridge, giảm từ 2.330 dòng xuống ~670 dòng.
+  - Tương thích ngược hoàn toàn 100% tất cả các method công khai cho UI và unit tests.
+- [x] **Cập nhật đóng gói PyInstaller**:
+  - Bổ sung `'core_utils'`, `'converters'`, `'file_classifier'` vào `hiddenimports` trong `src/SuperSearch.spec`.
+- [x] **Dọn dẹp code thừa trong `data/SuperSearch.html`**:
+  - Tối ưu hóa UI bridge, KaTeX cục bộ offline và kiểm chứng toàn diện kết nối backend.
+- [x] **Kiểm thử hồi quy 100%**:
+  - Bổ sung `tests/test_modular_decomposition.py`, nâng tổng số unit tests lên 54/54 tests pass 100%.
 
-### Giai đoạn 4: Nâng cấp Frontend & Trải nghiệm Người Dùng (UI/UX Transformation)
-- [ ] Tách nhỏ CSS, JS khỏi `SuperSearch.html`.
-- [ ] Bổ sung màn hình Cài đặt (Settings Modal) hoàn chỉnh.
-- [ ] Cải tiến thanh tiến trình quét (hiển thị ETA, tốc độ, danh sách lỗi chi tiết).
-- [ ] Tối ưu hóa giao diện Preview (In-doc search, zoom, dark/light theme chuẩn hóa).
+### Giai đoạn 5: Kiểm Thử Tải & Nghiệm Thu Toàn Diện (Stress Testing & Verification)
+- [x] Viết test suite kiểm thử toàn diện `tests/test_safety_rails.py`:
+  - Đường dẫn dài > 240 ký tự Windows (`test_safe_long_path_formatting`).
+  - Cơ chế Task Timeout chặn treo luồng (`test_run_with_timeout_exceeded`).
+  - Xung đột khóa file retry thành công (`test_open_file_with_retry`).
+  - SQLite Pragmas hiệu năng cao (`test_sqlite_pragmas_tuning`).
+  - Giải mã tên tệp ZIP non-UTF-8 (`test_zip_filename_decoding_cp437_fallback`).
+  - Dọn dẹp file tạm `.tmp-*` mồ côi (`test_cleanup_stale_temp_files`).
+- [x] Kiểm thử toàn bộ hệ thống đảm bảo 100% tests pass (50/50 unit tests).
+
+### Giai đoạn 6: Khắc Phục Lỗi Kỹ Thuật, Tích Hợp & Lỗ Hổng Ngầm (Deep Audit Findings & Production Fixes)
+- [x] **Vá Lỗi Đóng Gói Di Động (`pack_portable.py`)**:
+  - Sao chép đệ quy toàn bộ thư mục `data/vendor/katex/` vào `SuperSearch_Portable.zip` thay vì chỉ sao chép các tệp ảnh đơn lẻ.
+  - Ngăn chặn lỗi thiếu thư viện KaTeX offline trên các máy người dùng chạy bản Portable.
+- [x] **Vá Lỗi Xuất Word Nhân Đôi Tiêu Đề & Nuốt Dòng Văn Bản (`src/export_service.py`)**:
+  - Bổ sung lệnh `continue` sau khi xử lý heading (`if line.startswith("#"):`) trong hàm `export_to_docx`.
+  - Khắc phục lỗi con trỏ dòng tăng 2 lần làm xóa mất dòng đầu tiên của đoạn văn sau tiêu đề và nhân đôi tiêu đề thành đoạn văn thường.
+- [x] **Vá Lỗi Nhận Diện LaTeX Inline Cho Word OMML (`src/export_service.py`)**:
+  - Điều chỉnh regex `_add_inline_runs` khớp đúng cú pháp `\( ... \)` (thay vì 5 gạch chéo ngược `\\\\\\\(` chỉ khớp với 2 gạch chéo ngược).
+  - Đảm bảo công thức toán do Gemini OCR xuất ra được chuyển đổi chính xác sang công thức toán gốc Word OMML.
+- [x] **Vá Lỗi Tích Hợp Postprocessor Bị Kẹt Bởi Marker Trang (`src/ocr_postprocessor.py` & `src/converters.py`)**:
+  - Cập nhật hàm `heal_page_pair` nhận diện và bỏ qua tiền tố chú thích `<!-- PAGE X ... -->` khi tìm ký tự bắt đầu của trang kế tiếp.
+  - Khôi phục hoạt động thực tế 100% cho logic hàn gắn câu và nối từ gạch nối mềm (soft-hyphen) xuyên trang.
+- [x] **Vá Lỗi Bóc Tách File DOC/XLS Trong Tệp Nén ZIP (`src/converters.py`)**:
+  - Cập nhật `LocalDocConverter` và `LocalXlsConverter` hỗ trợ bóc tách trực tiếp từ stream dữ liệu (`file_stream` / `BytesIO`) khi `stream_info.local_path` là `None`.
+  - Khắc phục lỗi bỏ sót trắng nội dung các file `.doc` và `.xls` nằm bên trong tệp nén `.zip`.
+- [x] **Vá Lỗi Đường Dẫn KaTeX Trong File HTML Tạo Ra (`src/html_builder.py`)**:
+  - Cập nhật đường dẫn tham chiếu tài nguyên KaTeX trong `KATEX_RESOURCES` (`../../data/vendor/katex/`) tương thích chuẩn khi mở từ `runtime/HTML/`.
+- [x] **Cải Tiến UX Nút "Đối Chiếu 1:1" Quick View (`data/SuperSearch.html`)**:
+  - Kiểm tra loại tệp của tài liệu trước khi hiển thị; ẩn hoặc vô hiệu hóa nút "Đối chiếu 1:1" khi mở các file văn bản không có trang scan (DOCX, XLSX, TXT).
+- [x] **Bổ Sung In-Memory LRU Cache Cho Trang Ảnh Scan PDF (`src/app.py`)**:
+  - Lưu cache trong bộ nhớ RAM cho tối đa 15 trang ảnh vừa render của PDF trong `get_page_preview_image`, loại bỏ độ trễ và hiện tượng giật lag khi lật qua lại giữa các trang.
+- [x] **Vá Lỗi Mở File Explorer Chứa Tiền Tố Đường Dẫn Dài (`src/app.py` `open_explorer`)**:
+  - Gỡ bỏ tiền tố `\\?\` trước khi truyền tham số cho `explorer.exe /select` trên Windows để tránh lỗi không mở được thư mục.
+- [x] **Kiểm Thử Hồi Quy Toàn Diện**:
+  - Viết bộ test `tests/test_audit_phase3_fixes.py` xác thực độc lập 9 điểm vá lỗi trên.
+  - Bảo đảm toàn bộ test suite (70/70 tests) pass 100%.
 
 ---
 
-## 5. Tiêu Chí Nghiệm Thu (Acceptance Criteria)
-1. **Tính độc lập offline**: Phần mềm khởi động và hoạt động 100% tính năng khi ngắt hoàn toàn kết nối mạng.
-2. **Độ ổn định quét**: Quét thư mục 50.000 tệp không bị tràn bộ nhớ RAM (RAM duy trì < 350MB).
-3. **Tốc độ chỉ mục gia tăng**: Khi thêm 1 tệp mới vào kho 10.000 tệp đã có, thời gian cập nhật chỉ mục hoàn tất trong dưới 2 giây (thay vì quét lại toàn bộ từ đầu).
-4. **AI OCR hoạt động chuẩn**: Gemini OCR kết nối thành công tới model `gemini-3.6-flash` và trả về kết quả chính xác khi cung cấp API Key hợp lệ.
-5. **Tính tổng quát**: Không còn bất kỳ dấu vết hard-code thông tin của doanh nghiệp CICT nào trong code và giao diện.
-6. **Kiểm thử hồi quy**: Toàn bộ unit tests hiện có và mới viết đều pass 100%.
+## 4. Tiêu Chí Nghiệm Thu (Acceptance Criteria)
+1. **Độ ổn định đường dẫn dài**: Quét và lập chỉ mục trơn tru các file có đường dẫn sâu > 260 ký tự trên Windows.
+2. **Khả năng tự phục hồi**: File hỏng hoặc quá trình bóc tách bị nghẽn không làm treo luồng quét vĩnh viễn nhờ cơ chế timeout.
+3. **Chống mất dữ liệu Watchdog**: Copy 10.000 file vào cùng lúc không bị mất sự kiện nhờ cơ chế tự phục hồi tràn bộ đệm.
+4. **Hiệu năng I/O SQLite**: Tốc độ đọc ghi FTS5 tăng tối thiểu 200% nhờ memory mapping và WAL tuning.
+5. **Mã nguồn sạch và dễ bảo trì**: `app.py` được chia nhỏ thành các module dưới 500 dòng/file theo SRP.
+6. **Không mất dữ liệu khi xuất Word**: File Word xuất ra giữ trọn vẹn 100% dòng văn bản sau tiêu đề và nhúng chuẩn công thức toán OMML.
+7. **Bản Portable hoàn thiện**: Gói ZIP di động chứa đầy đủ offline assets KaTeX không phụ thuộc mạng.
+8. **Kiểm thử 100%**: Tất cả unit tests và stress tests mới đều vượt qua hoàn toàn.
 
 ---
 
-## 6. Điều Kiện Chặn & Phê Duyệt (Gate & Approval)
-- Đây là kế hoạch kiểm toán và nâng cấp toàn diện (Plan Draft).
+## 5. Điều Kiện Chặn & Phê Duyệt (Gate & Approval)
+- Đây là kế hoạch nâng cấp giải quyết triệt để các lỗi kỹ thuật và lỗi ngầm (Plan Continuation v6).
 - Tuyệt đối không chỉnh sửa mã nguồn cho đến khi nhận được phê duyệt chính thức từ người dùng.
 - Lệnh phê duyệt hợp lệ: `ok`, `làm đi`, `duyệt`, `ok duyệt`, `ok làm đi`, `được rồi làm đi`, `duyệt phương án`, `làm đi bạn`.

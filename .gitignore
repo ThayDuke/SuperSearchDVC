@@ -27,7 +27,6 @@ ENV/
 
 # User private data
 UserData/
-1CICTDATA/
 MARKDOWN/
 
 # SuperSearch runtime data and local build artifacts

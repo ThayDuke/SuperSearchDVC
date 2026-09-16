@@ -17,7 +17,9 @@ a = Analysis(
         'html.parser', 'html.entities', 'http.client', 'http.cookiejar',
         'urllib.request', 'urllib.parse', 'urllib.error', 'urllib.response',
         'decimal', 'csv', 'uuid', 'logging', 'zoneinfo', 'mimetypes',
-        'index_store', 'sqlite3', 'gemini_ocr_engine', 'html_builder'
+        'index_store', 'sqlite3', 'gemini_ocr_engine', 'html_builder',
+        'export_service', 'folder_watchdog', 'docx',
+        'core_utils', 'converters', 'file_classifier', 'ocr_postprocessor'
     ],
     hookspath=[],
     hooksconfig={},

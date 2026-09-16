@@ -185,18 +185,42 @@ hr {
 }
 """
 
-MATHJAX_SCRIPT = """
+KATEX_RESOURCES = """
+<link rel="stylesheet" href="../../data/vendor/katex/katex.min.css" onerror="this.onerror=null;this.href='vendor/katex/katex.min.css';">
 <script>
-    window.MathJax = {
-        tex: {
-            inlineMath: [['\\\\(', '\\\\)'], ['$', '$']],
-            displayMath: [['\\\\[', '\\\\]'], ['$$', '$$']],
-            processEscapes: true
-        },
-        options: {
-            skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code']
-        }
-    };
+(function() {
+    function loadScript(src, fallback, cb) {
+        var s = document.createElement('script');
+        s.src = src;
+        s.onload = cb;
+        s.onerror = function() {
+            if (fallback) {
+                var s2 = document.createElement('script');
+                s2.src = fallback;
+                s2.onload = cb;
+                document.head.appendChild(s2);
+            }
+        };
+        document.head.appendChild(s);
+    }
+    loadScript('../../data/vendor/katex/katex.min.js', 'vendor/katex/katex.min.js', function() {
+        loadScript('../../data/vendor/katex/auto-render.min.js', 'vendor/katex/auto-render.min.js', function() {
+            if (window.renderMathInElement) {
+                renderMathInElement(document.body, {
+                    delimiters: [
+                        {left: '$$', right: '$$', display: true},
+                        {left: '$', right: '$', display: false},
+                        {left: '\\\\(', right: '\\\\)', display: false},
+                        {left: '\\(', right: '\\)', display: false},
+                        {left: '\\\\[', right: '\\\\]', display: true},
+                        {left: '\\[', right: '\\]', display: true}
+                    ],
+                    throwOnError: false
+                });
+            }
+        });
+    });
+})();
 </script>
 """
 
@@ -403,7 +427,7 @@ def build_html_document(markdown_text, title="", original_path=""):
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{safe_title}</title>
-    {MATHJAX_SCRIPT}
+    {KATEX_RESOURCES}
     <style>
         {CSS_STYLES}
     </style>

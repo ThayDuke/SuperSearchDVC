@@ -3,7 +3,7 @@ import sys
 import tempfile
 import unittest
 from types import SimpleNamespace
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -100,6 +100,31 @@ class SearchRemasterTests(unittest.TestCase):
         self.assertEqual(unaccented["total"], 1)
         self.assertEqual(accented["documents"][0]["document_id"], unaccented["documents"][0]["document_id"])
 
+    def test_spelling_suggestion_uses_body_vocabulary(self):
+        store = self.make_store()
+        store.replace_entries([
+            entry("s", "sports.txt", "Sports guide", "The rules of football"),
+        ])
+
+        exact = store.search_documents("football")
+        typo = store.search_documents("footbal")
+
+        self.assertEqual(exact["total"], 1)
+        self.assertIsNone(exact["suggested_query"])
+        self.assertEqual(typo["total"], 0)
+        self.assertEqual(typo["suggested_query"], "football")
+        self.assertEqual(typo["suggestion_reason"], "spelling")
+
+    def test_spelling_suggestion_preserves_correct_query_tokens(self):
+        store = self.make_store()
+        store.replace_entries([
+            entry("s", "sports.txt", "Sports guide", "football safety rules"),
+        ])
+
+        typo = store.search_documents("footbal saftey")
+
+        self.assertEqual(typo["suggested_query"], "football safety")
+
     def test_within_query_is_separate_from_phrase_ranking(self):
         store = self.make_store()
         store.replace_entries([
@@ -155,6 +180,99 @@ class SearchRemasterTests(unittest.TestCase):
 
         self.assertEqual((year, month), (0, 0))
 
+    def test_api_export_and_capabilities(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            api = Api.__new__(Api)
+            api.base_dir = temp_dir
+            api.index_store = MagicMock()
+            api.index_store.get_document.return_value = {
+                "title": "Football guide",
+                "original_path": "C:/docs/football.pdf",
+                "doc_type": "Tài liệu",
+                "year": "2025",
+                "content": "# Football\n\nA short guide.",
+            }
+
+            capabilities = api.get_runtime_capabilities()
+            self.assertTrue(capabilities["export_document"])
+            self.assertTrue(capabilities["open_document_location"])
+            markdown = api.export_document("doc-1", "md", temp_dir)
+            docx = api.export_document("doc-1", "docx", temp_dir)
+            self.assertTrue(markdown["success"])
+            self.assertTrue(docx["success"])
+            self.assertTrue(os.path.isfile(markdown["path"]))
+            self.assertTrue(os.path.isfile(docx["path"]))
+
+    def test_api_open_document_location_uses_document_id(self):
+        api = Api.__new__(Api)
+        api.index_store = MagicMock()
+        api.index_store.get_document.return_value = {
+            "absolute_original_path": r"\\?\C:\Documents\Football Guide.pdf",
+        }
+        api.index_store.resolve_file_path.return_value = r"\\?\C:\Documents\Football Guide.pdf"
+        with patch("app.os.path.isfile", return_value=True), patch("subprocess.Popen") as popen:
+            result = api.open_document_location("doc-1")
+
+        self.assertTrue(result["success"])
+        self.assertEqual(result["action"], "selected_file")
+        self.assertEqual(result["path"], r"C:\Documents\Football Guide.pdf")
+        popen.assert_called_once_with(["explorer.exe", "/select,", r"C:\Documents\Football Guide.pdf"])
+
+    def test_api_open_document_location_prefers_current_scan_folder(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            scan_dir = os.path.join(temp_dir, "scanned")
+            os.makedirs(scan_dir)
+            source = os.path.join(scan_dir, "football.pdf")
+            with open(source, "wb") as handle:
+                handle.write(b"source")
+
+            api = Api.__new__(Api)
+            api.scan_dir = scan_dir
+            api.index_store = MagicMock()
+            api.index_store.get_document.return_value = {
+                "original_path": "football.pdf",
+                "absolute_original_path": os.path.join(temp_dir, "Documents", "football.pdf"),
+            }
+            with patch("subprocess.Popen") as popen:
+                result = api.open_document_location("doc-1")
+
+            self.assertTrue(result["success"])
+            self.assertEqual(result["path"], source)
+            popen.assert_called_once_with(["explorer.exe", "/select,", source])
+
+    def test_api_open_explorer_resolves_legacy_relative_path_in_scan_folder(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            source = os.path.join(temp_dir, "football.pdf")
+            with open(source, "wb") as handle:
+                handle.write(b"source")
+            api = Api.__new__(Api)
+            api.scan_dir = temp_dir
+            api.index_store = MagicMock()
+            api.index_store.resolve_file_path.return_value = None
+            with patch("subprocess.Popen") as popen:
+                result = api.open_explorer("football.pdf")
+            self.assertTrue(result)
+            popen.assert_called_once_with(["explorer.exe", "/select,", source])
+
+    def test_api_open_explorer_keeps_comma_filename_as_separate_argument(self):
+        api = Api.__new__(Api)
+        api.scan_dir = None
+        api.index_store = MagicMock()
+        api.index_store.resolve_file_path.return_value = None
+        path = r"C:\Books\Global Success, tập một.pdf"
+        with patch("app.os.path.isfile", return_value=True), patch("subprocess.Popen") as popen:
+            result = api.open_explorer(path)
+        self.assertTrue(result)
+        popen.assert_called_once_with(["explorer.exe", "/select,", path])
+
+    def test_html_export_success_dialog_has_full_path_and_navigation(self):
+        with open(os.path.join(REPO_ROOT, "data", "SuperSearch.html"), "r", encoding="utf-8") as handle:
+            html = handle.read()
+        self.assertIn('id="lgAlertActions"', html)
+        self.assertIn('showExportSuccessDialog(res, format)', html)
+        self.assertIn('format === "docx" ? "Đến file docx" : "Đến file markdown"', html)
+        self.assertIn('path.textContent = String(result && result.path || "")', html)
+
     def test_sync_entries_incremental_and_delete(self):
         store = self.make_store()
         doc1 = entry("scan1", "file1.txt", "Tài liệu 1", "nội dung tìm kiếm ban đầu", year="2025")
@@ -184,4 +302,3 @@ class SearchRemasterTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-

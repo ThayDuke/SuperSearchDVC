@@ -9,6 +9,14 @@ import time
 import zipfile
 
 
+BACKEND_BUILD_INPUTS = (
+    "app.py", "index_store.py", "gemini_ocr_engine.py", "html_builder.py",
+    "export_service.py", "folder_watchdog.py", "core_utils.py", "converters.py",
+    "file_classifier.py", "ocr_postprocessor.py", "SuperSearch.spec",
+    "requirements.txt",
+)
+
+
 def _ignore_runtime_junk(_directory, names):
     return {name for name in names if name == "__pycache__" or name.endswith((".pyc", ".pyo"))}
 
@@ -31,12 +39,28 @@ def _copy_required_file(source, destination):
     shutil.copy2(source, destination)
 
 
+def _assert_exe_fresh(exe_path, base_dir):
+    """Prevent packaging an external HTML UI with a stale Python bridge."""
+    exe_mtime = os.path.getmtime(exe_path)
+    stale = []
+    for name in BACKEND_BUILD_INPUTS:
+        source = os.path.join(base_dir, "src", name) if name != "requirements.txt" else os.path.join(base_dir, name)
+        if os.path.isfile(source) and os.path.getmtime(source) > exe_mtime:
+            stale.append(os.path.relpath(source, base_dir))
+    if stale:
+        raise RuntimeError(
+            "EXE cũ hơn backend inputs; hãy chạy python src/build.py --rebuild trước khi đóng gói: "
+            + ", ".join(stale)
+        )
+
+
 def main():
     base_dir = os.path.dirname(os.path.abspath(__file__))
     zip_path = os.path.join(base_dir, "SuperSearch_Portable.zip")
     exe_src = os.path.join(base_dir, "build_artifacts", "SuperSearch.exe")
     if not os.path.isfile(exe_src):
         raise FileNotFoundError("Không tìm thấy SuperSearch.exe; hãy build trước khi đóng gói.")
+    _assert_exe_fresh(exe_src, base_dir)
     html_src = os.path.join(base_dir, "data", "SuperSearch.html")
     tess_src = os.path.join(base_dir, "src", "Tesseract-OCR")
     if not os.path.isfile(html_src):
@@ -60,6 +84,9 @@ def main():
         data_dest = os.path.join(temp_dir, "data")
         os.makedirs(data_dest, exist_ok=True)
         shutil.copy2(html_src, os.path.join(data_dest, "SuperSearch.html"))
+        vendor_src = os.path.join(base_dir, "data", "vendor")
+        if os.path.isdir(vendor_src):
+            shutil.copytree(vendor_src, os.path.join(data_dest, "vendor"), ignore=_ignore_runtime_junk)
         for name in os.listdir(os.path.join(base_dir, "data")):
             source = os.path.join(base_dir, "data", name)
             if os.path.isfile(source) and os.path.splitext(name)[1].lower() in {".ico", ".png", ".jpg", ".jpeg", ".svg"}:
